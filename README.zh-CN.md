@@ -1,12 +1,13 @@
 # codex-reasonix-bridge 中文说明
 
-当前仓库首页 [README.md](README.md) 已经改为中文优先版本，并作为主要中文 README 维护。
+本仓库的主 README 已使用中文编写，包含了所有详细说明。
 
-如果你是从搜索或文档链接进来的，直接看 [README.md](README.md) 即可：
+**请直接访问主文档：[README.md](README.md)**
 
-- 30 秒上手
-- mode 场景速查
-- Codex / Reasonix 权责边界
-- 常用命令
-- Reasonix upstream PR 拆分原则
+主文档内容包括：
 
+- **30 秒快速开始**：安装、dry-run 测试、首次调用
+- **模式 (Modes) 速查**：五种 review 模式的区别和用法
+- **职责边界**：本仓库与 [`codex-mimo-skill`](https://github.com/enderzcx/codex-mimo-skill) 的明确分工
+- **常用命令**：针对 diff review、计划审查等场景的示例
+- **架构原则**：为何保持外部 bridge，以及 upstream PR 方向

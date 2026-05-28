@@ -1,62 +1,64 @@
 # codex-reasonix-bridge
 
-> Codex 写代码，Reasonix / DeepSeek v4 Pro 做 review。
+> Codex 负责构建，Reasonix / DeepSeek v4 Pro 负责 review。
 
-`codex-reasonix-bridge` 是一个外部 Codex bridge，用来把 Codex 的工程计划、diff、bug 假设和最终判断交给 Reasonix / DeepSeek v4 Pro 过一遍。
+`codex-reasonix-bridge` 是一个外部 Codex bridge，它将 Codex 的工程计划、代码 diff、问题假设和最终判断交给 Reasonix / DeepSeek v4 Pro 进行独立审查。
 
 ```text
 Codex plans/builds -> bridge calls Reasonix / DeepSeek -> review -> Codex decides and verifies
 ```
 
-## 和 codex-mimo-skill 的分工
+## 与 codex-mimo-skill 的分工
 
-MiMo 已经从这个仓库拆出去，单独放在 [`codex-mimo-skill`](https://github.com/enderzcx/codex-mimo-skill)。
+MiMo 的相关能力（文案、中文表达、UI/UX 设计、前端反馈等）已独立拆分至 [`codex-mimo-skill`](https://github.com/enderzcx/codex-mimo-skill)。本仓库专注于工程 review。
 
-| 仓库 | 模型 / harness | 负责什么 |
+| 仓库 | 模型 / Harness | 职责范围 |
 |---|---|---|
-| `codex-mimo-skill` | Codex 直接调用 MiMo | 文案、中文表达、UI/UX、human feedback、frontend first-pass |
-| `codex-reasonix-bridge` | Reasonix / DeepSeek v4 Pro | 工程 review、二意见、最终判断 |
+| `codex-mimo-skill` | Codex 直接调用 MiMo | 文案、中文表达、UI/UX 设计、human feedback、前端代码首版 |
+| `codex-reasonix-bridge` | Reasonix / DeepSeek v4 Pro | 工程代码 review、独立第二意见、最终技术判断 |
 
-这个仓库不再提供 MiMo provider，也不处理 UI 文案和前端首版。那些任务走 `codex-mimo`。
+**本仓库不再包含 MiMo provider，也不处理 UI 文案和前端代码生成。这些任务请使用 `codex-mimo-skill`。**
 
-## 30 秒上手
+## 30 秒快速开始
 
 ```bash
 npm link
 ```
 
-先跑 dry-run，确认路由不花钱：
+先执行一次 dry-run，验证路由配置且不产生实际调用费用：
 
 ```bash
 crb delegate --mode final-review --dry-run --json "审一下这个方案"
 # 预期：返回 deepseek-v4-pro:cloud 的路由信息，不调用模型
 ```
 
-真实 review 需要本机已有可用 `reasonix`：
+进行真实 review 前，请确保本机 PATH 中有可用的 `reasonix` 可执行文件：
 
 ```bash
 crb delegate --mode final-review --json "审一下这个方案有没有明显风险"
 ```
 
-如果 `reasonix` 不在 `PATH`，可以指定二进制：
+如果 `reasonix` 不在系统 PATH 中，可以通过环境变量指定其路径：
 
 ```bash
 REASONIX_BIN=/path/to/reasonix crb delegate --mode final-review --json "审一下这个方案"
 ```
 
-## Modes
+## 可用模式 (Modes)
 
-| Mode | 默认模型 | 用途 |
+每个模式对应一个特定的 review 场景。关键 review 默认使用 `deepseek-v4-pro:cloud`；低成本通用任务使用 `deepseek-v4-flash:cloud`。
+
+| 模式 | 默认模型 | 典型用途 |
 |---|---|---|
-| `engineering-feedback` | `deepseek-v4-pro:cloud` | 对 Codex 的方案或 diff 做工程二意见 |
-| `engineering-plan` | `deepseek-v4-pro:cloud` | 对 Codex 的实现计划、验证策略、回滚点做 review |
-| `daily-review` | `deepseek-v4-pro:cloud` | 日常 second opinion |
-| `final-review` | `deepseek-v4-pro:cloud` | 高价值最终判断 |
-| `general` | `deepseek-v4-flash:cloud` | 低成本混合 review |
+| `engineering-feedback` | `deepseek-v4-pro:cloud` | 对 Codex 提交的方案或代码 diff 进行工程层面的反馈 |
+| `engineering-plan` | `deepseek-v4-pro:cloud` | 审查 Codex 的实现计划、验证策略和回滚方案 |
+| `daily-review` | `deepseek-v4-pro:cloud` | 日常开发中的快速 second opinion |
+| `final-review` | `deepseek-v4-pro:cloud` | 高价值变更前的最终、权威判断 |
+| `general` | `deepseek-v4-flash:cloud` | 低成本、通用的混合 review |
 
-## 常用命令
+## 常用命令示例
 
-工程第二意见：
+**获取工程第二意见：**
 
 ```bash
 git diff > /tmp/change.diff
@@ -65,7 +67,7 @@ crb delegate --mode engineering-feedback --json \
   "从风险、边界、测试角度审这个改动"
 ```
 
-计划 review：
+**审查实现计划：**
 
 ```bash
 crb delegate --mode engineering-plan --json \
@@ -73,7 +75,7 @@ crb delegate --mode engineering-plan --json \
   "审一下这个实现计划的边界、验证和回滚点"
 ```
 
-最终判断：
+**请求最终判断：**
 
 ```bash
 crb delegate --mode final-review --json \
@@ -90,49 +92,47 @@ npm test
 npm link
 ```
 
-Bridge 默认寻找 `PATH` 上的 `reasonix`。如果没有，它会尝试使用桌面版内置 CLI：
+Bridge 默认在系统 PATH 中寻找 `reasonix` 可执行文件。如果未找到，它会尝试使用 Reasonix 桌面版内置的 CLI：
 
 ```text
 /Applications/Reasonix.app/Contents/Resources/node
 /Applications/Reasonix.app/Contents/Resources/dist/cli/index.js
 ```
 
-也可以通过 `REASONIX_BIN` 指定：
+你也可以通过 `REASONIX_BIN` 环境变量精确指定：
 
 ```bash
 REASONIX_BIN=/path/to/reasonix crb delegate --mode final-review --json "审一下这个方案"
 ```
 
-## Codex Skill
+## 安装 Codex Skill
 
-安装内置 skill：
+安装内置 skill 后，Codex 在后续会话中可以根据 `codex-reasonix` 规则，自动在工程审查相关任务中调用此 bridge。
 
 ```bash
 npm run install:skill
 ```
 
-安装后，未来 Codex session 可以按 `codex-reasonix` 的规则，在工程二意见、计划 review、日常 review、最终判断等任务里自动调用 bridge。
+## 为什么保持为外部 Bridge
 
-## 为什么仍然是外部 bridge
+Reasonix 核心应保持 **DeepSeek 优先、缓存优先、单一模型循环** 的设计原则。本仓库仅作为 Codex 侧的 review 协作边界层，不要求 Reasonix 核心为 Codex 的复杂工作流引入多模型策略。
 
-Reasonix core 应保持 DeepSeek-first、cache-first、single-model loop。这个仓库只做 Codex 侧的 review 协作边界，不要求 Reasonix core 为 Codex workflow 背复杂多模型策略。
+**适合提交给 Reasonix upstream 的 PR 方向：**
 
-适合继续给 Reasonix upstream PR 的：
+- OpenAI-compatible `/models` 端点的故障回退逻辑
+- 流式响应中 `include_usage` 的支持
+- CLI 打包元数据以正确输出 `--version`
+- 针对 DeepSeek/Ollama Cloud 的 model ID 规范化（需严格限定范围）
+- 桌面端上下文 token 计量修复
 
-- OpenAI-compatible `/models` doctor fallback
-- streaming `include_usage` support
-- CLI bundle package metadata for correct `--version`
-- narrowly scoped DeepSeek/Ollama Cloud model id normalization
-- desktop context token meter fixes
+**应保留在本外部仓库的：**
 
-应该留在外部仓库的：
+- Codex review 协议定义
+- DeepSeek v4 Pro 的角色路由逻辑
+- Codex AGENTS / skill 协作规则
 
-- Codex review protocol
-- DeepSeek v4 Pro role routing
-- Codex AGENTS / skill collaboration rules
+具体的拆分原则详见 [docs/upstream-prs.md](docs/upstream-prs.md)。
 
-具体拆分见 [docs/upstream-prs.md](docs/upstream-prs.md)。
-
-## License
+## 许可证
 
 MIT
