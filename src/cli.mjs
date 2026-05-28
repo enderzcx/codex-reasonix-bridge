@@ -56,6 +56,7 @@ export async function delegate(argv) {
     prompt,
     json: opts.json,
     noProxy: opts.noProxy,
+    timeoutMs: opts.timeoutMs,
   });
 
   if (!opts.json) {
@@ -78,6 +79,7 @@ export function parseDelegateArgs(argv) {
     model: undefined,
     effort: undefined,
     reasonixBin: undefined,
+    timeoutMs: undefined,
     task: "",
   };
   const positional = [];
@@ -91,6 +93,7 @@ export function parseDelegateArgs(argv) {
     else if (arg === "--no-proxy") opts.noProxy = true;
     else if (arg === "--model" || arg === "-m") opts.model = requireValue(argv, ++i, arg);
     else if (arg === "--effort") opts.effort = requireValue(argv, ++i, "--effort");
+    else if (arg === "--timeout-ms") opts.timeoutMs = parseTimeoutMs(requireValue(argv, ++i, "--timeout-ms"));
     else if (arg === "--reasonix-bin") opts.reasonixBin = requireValue(argv, ++i, "--reasonix-bin");
     else if (arg === "--help" || arg === "-h") {
       printDelegateHelp();
@@ -105,6 +108,12 @@ function requireValue(argv, index, flag) {
   const value = argv[index];
   if (!value || value.startsWith("--")) throw new Error(`${flag} requires a value`);
   return value;
+}
+
+function parseTimeoutMs(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) throw new Error("--timeout-ms must be a non-negative number");
+  return parsed;
 }
 
 function readInputFile(path) {
@@ -204,6 +213,7 @@ Options:
   --json                 Ask for and emit stable JSON.
   -m, --model <id>       Override routed model.
   --effort <level>       low | medium | high | max.
+  --timeout-ms <ms>      Kill a stuck Reasonix run after this many ms. Default: 180000.
   --dry-run              Print route metadata without calling Reasonix.
   --reasonix-bin <path>  Override Reasonix executable.
   --no-proxy             Pass --no-proxy to Reasonix.
