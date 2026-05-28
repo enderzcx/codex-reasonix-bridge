@@ -1,7 +1,7 @@
 {
   "name": "codex-reasonix-bridge",
   "version": "0.1.0",
-  "description": "Codex-first bridge for delegating copy, UI, and review work to Reasonix/Ollama Cloud models.",
+  "description": "Codex-first bridge for DeepSeek v4 Pro reviews through Reasonix/Ollama Cloud.",
   "type": "module",
   "bin": {
     "codex-reasonix-bridge": "./bin/codex-reasonix-bridge.mjs",
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "smoke": "node ./bin/codex-reasonix-bridge.mjs delegate --mode copywrite --dry-run --json \"写一个中文空状态\"",
+    "smoke": "node ./bin/codex-reasonix-bridge.mjs delegate --mode final-review --dry-run --json \"审一下这个方案\"",
     "install:skill": "node ./scripts/install-skill.mjs"
   },
   "keywords": [
@@ -18,7 +18,7 @@
     "deepseek",
     "ollama",
     "ai-native",
-    "copywriting"
+    "review"
   ],
   "license": "MIT",
   "engines": {

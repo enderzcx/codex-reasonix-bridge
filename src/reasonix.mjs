@@ -4,6 +4,10 @@ import { spawn, spawnSync } from "node:child_process";
 const APP_NODE = "/Applications/Reasonix.app/Contents/Resources/node";
 const APP_CLI = "/Applications/Reasonix.app/Contents/Resources/dist/cli/index.js";
 
+export async function runDelegateModel({ reasonixBin, model, effort, system, prompt, noProxy = false }) {
+  return runReasonix({ reasonixBin, model, effort, system, prompt, noProxy });
+}
+
 export function resolveReasonixCommand(reasonixBin = process.env.REASONIX_BIN) {
   if (reasonixBin) return [reasonixBin];
 

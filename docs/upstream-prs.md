@@ -5,7 +5,7 @@ archive_at: 2026-06-26
 
 # Reasonix Upstream PR Split
 
-This repo keeps Codex-specific bridge behavior out of Reasonix core.
+This repo keeps Codex-specific DeepSeek review behavior out of Reasonix core.
 
 Reasonix upstream signal: PR #1911 was closed even with green CI/CodeQL because
 the maintainer wants core to stay DeepSeek-first, cache-first, and single-model
@@ -84,7 +84,7 @@ Why upstream:
 
 Risk:
 
-- Do not upstream Qwen/Kimi/GLM/MiniMax role routing into core.
+- Do not upstream MiMo direct provider or copy/UI workflow into core.
 - Keep the PR only about DeepSeek model id compatibility.
 
 Suggested PR title:
@@ -97,17 +97,23 @@ fix(config): normalize DeepSeek cloud model aliases
 
 - `delegate` mode protocol
 - Codex AGENTS/skill collaboration rules
-- Qwen/Kimi/GLM/MiniMax role routing
-- Chinese copy/UI/human-feedback workflow
+- DeepSeek v4 Pro review routing
 - overlay/update-proof installation
 - any MCP/Codex bridge server
+
+## Moved To `codex-mimo-skill`
+
+- MiMo direct provider
+- Chinese copy/UI/human-feedback workflow
+- `frontend-first-pass`
+- MiMo env loading and OpenAI-compatible direct calls
 
 ## Why
 
 Reasonix core should be a focused DeepSeek client.
 
-`codex-reasonix-bridge` should be the collaborative layer around Codex:
+`codex-reasonix-bridge` should be the Reasonix review layer around Codex:
 
 ```text
-Codex -> bridge mode/router -> Reasonix/Ollama model -> copy/brief/review -> Codex applies
+Codex -> bridge mode/router -> Reasonix/DeepSeek -> review -> Codex applies
 ```

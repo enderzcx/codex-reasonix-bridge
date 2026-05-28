@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { stdin, stdout } from "node:process";
 import { buildSystemPrompt, buildUserPrompt } from "./prompts.mjs";
-import { runReasonix } from "./reasonix.mjs";
+import { runDelegateModel } from "./reasonix.mjs";
 import { DELEGATE_MODES, MODEL_CATALOG, normalizeMode, resolveRoute, routeMetadata } from "./routes.mjs";
 
 const INPUT_FILE_BYTE_CAP = 48 * 1024;
@@ -48,12 +48,13 @@ export async function delegate(argv) {
 
   const system = buildSystemPrompt(mode, opts.json);
   const prompt = buildUserPrompt({ task, contexts: opts.contexts, files });
-  const result = await runReasonix({
+  const result = await runDelegateModel({
     reasonixBin: opts.reasonixBin,
     model: route.model,
     effort: opts.effort,
     system,
     prompt,
+    json: opts.json,
     noProxy: opts.noProxy,
   });
 
@@ -151,7 +152,7 @@ export function wrapJsonOutput(raw, mode, routing) {
   return {
     mode,
     routing,
-    summary: "Reasonix returned non-JSON content.",
+    summary: "Delegate model returned non-JSON content.",
     deliverables: [{ type: "note", title: "raw", content: raw.trim() }],
     notes: ["The bridge wrapped the raw response because JSON parsing failed."],
     next_for_codex: [],
@@ -184,7 +185,7 @@ function printHelp() {
   stdout.write(`codex-reasonix-bridge
 
 Commands:
-  delegate [task]   Ask Reasonix/Ollama models for copy, UI, review, or planning help.
+  delegate [task]   Ask Reasonix / DeepSeek for engineering review or final judgment.
   modes             List delegate modes.
   models            Print model catalog JSON.
 

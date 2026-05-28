@@ -5,17 +5,20 @@
 `codex-reasonix-bridge` is an external Codex-first bridge for Reasonix.
 
 It exists because Reasonix upstream wants core to remain DeepSeek-first,
-cache-first, and single-model-loop oriented. This bridge adds multi-model
-collaboration outside core.
+cache-first, and single-model-loop oriented. This bridge keeps Codex-specific
+DeepSeek review workflow outside core.
 
 ## Working Rules
 
 - Keep the bridge external. Do not vendor or fork Reasonix core.
 - Prefer stable `reasonix run` as the execution boundary.
-- Reasonix-side models may produce copy, briefs, naming, reviews, and plans.
+- Reasonix-side models may produce engineering reviews, risk notes, plans, and final judgment.
 - Codex remains the only engineering executor and final code reviewer.
 - Add modes only when they map to a real Codex workflow.
 - Avoid product claims that imply official Reasonix ownership.
+- Do not add MiMo, copywriting, UI/UX, human-feedback, or frontend-first-pass routing here.
+- MiMo work belongs in the sibling repo `codex-mimo-skill`.
+- DeepSeek v4 Pro owns engineering/final review here.
 
 ## Verification
 
@@ -31,7 +34,7 @@ npm run smoke
 For live model verification, use a short prompt:
 
 ```bash
-codex-reasonix-bridge delegate --mode copywrite --json "Reply with one short Chinese empty state"
+codex-reasonix-bridge delegate --mode final-review --json "审一下这个方案有没有明显风险"
 ```
 
 ## Upstream Discipline
