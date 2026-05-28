@@ -83,6 +83,37 @@ crb delegate --mode final-review --json \
   "只列 blocker/high risk 和必须补的验证"
 ```
 
+## 长时间 Review 使用后台 Job
+
+当 review 任务耗时较长，例如审查大型代码库或复杂架构方案时，建议使用后台 job 模式，避免 Codex 会话同步阻塞。后台 job 会在独立进程中运行，你可以通过命令管理其状态和结果。
+
+**启动后台 review：**
+
+```bash
+crb delegate --mode final-review --background --json "审一下这个大型架构重构方案"
+```
+
+**管理后台 job：**
+
+- `crb status`：查看所有后台 job 的状态
+- `crb result <job-id>`：获取指定 job 的 review 结果
+- `crb cancel <job-id>`：取消正在运行的后台 job
+
+**前台模式（默认）：**
+
+- 默认超时时间为 180000 毫秒（3 分钟）
+- 可通过 `--timeout-ms` 参数自定义
+- 适合快速、同步的 review 任务
+
+**后台模式：**
+
+- 默认 `timeoutMs` 为 0（无超时限制），除非显式传递 `--timeout-ms`
+- 适合长时间、异步的深度 review
+- 不阻塞 Codex 主工作流
+
+**最佳实践：**
+对于 `final-review` 等高价值模式，如果预计 review 时间较长，请优先使用 `--background`。前台模式适用于快速反馈场景，但长时间同步等待可能影响 Codex 的构建效率。
+
 ## 安装与配置
 
 ```bash

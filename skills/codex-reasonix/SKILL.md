@@ -46,6 +46,24 @@ codex-reasonix-bridge delegate --mode final-review --json \
 - `final-review`: high-confidence final judgment
 - `general`: mixed Reasonix review fallback
 
+## Long Reviews
+
+When a review may take a long time, use a background job so the Codex session is not blocked.
+
+Start:
+
+```bash
+crb delegate --mode final-review --background --json "审一下这个大型变更"
+```
+
+Manage:
+
+- `crb status`: view job status
+- `crb result <job-id>`: get the result
+- `crb cancel <job-id>`: cancel the job
+
+Foreground mode has a default timeout of 180000ms and is best for quick review. Background mode defaults to no timeout unless `--timeout-ms` is explicitly passed. For `final-review` or any large G2/G3 review, prefer `--background`.
+
 ## Discipline
 
 Reasonix output is review input, not an unconditional patch.

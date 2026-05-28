@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeMode, normalizeModelId, resolveRoute, routeMetadata } from "../src/routes.mjs";
 import { buildSystemPrompt, buildUserPrompt } from "../src/prompts.mjs";
-import { wrapJsonOutput } from "../src/cli.mjs";
+import { parseDelegateArgs, wrapJsonOutput } from "../src/cli.mjs";
 
 test("normalizes review modes and DeepSeek aliases", () => {
   assert.equal(normalizeMode("review"), "final-review");
@@ -57,4 +57,12 @@ test("wraps non-json output in stable JSON", () => {
   assert.equal(wrapped.mode, "final-review");
   assert.equal(wrapped.routing.provider, "reasonix");
   assert.equal(wrapped.deliverables[0].content, "hello");
+});
+
+test("parses background and timeout delegate controls", () => {
+  const opts = parseDelegateArgs(["--background", "--timeout-ms", "0", "--mode", "final-review", "review this"]);
+  assert.equal(opts.background, true);
+  assert.equal(opts.timeoutMs, 0);
+  assert.equal(opts.mode, "final-review");
+  assert.equal(opts.task, "review this");
 });
