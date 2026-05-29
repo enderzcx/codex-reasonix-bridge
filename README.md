@@ -2,10 +2,39 @@
 
 > Codex 负责构建，Reasonix / DeepSeek v4 Pro 负责 review。
 
-`codex-reasonix-bridge` 是一个外部 Codex bridge，它将 Codex 的工程计划、代码 diff、问题假设和最终判断交给 Reasonix / DeepSeek v4 Pro 进行独立审查。
+`codex-reasonix-bridge` 是给 **想让 Codex 和 DeepSeek v4 Pro 一起协作** 的开发者用的外部 bridge。它将 Codex 的工程计划、代码 diff、问题假设和最终判断交给 Reasonix / DeepSeek v4 Pro 进行独立审查。
 
 ```text
 Codex plans/builds -> bridge calls Reasonix / DeepSeek -> review -> Codex decides and verifies
+```
+
+## 先说清楚：需要先安装 Reasonix
+
+`crb` 本身不是 DeepSeek provider，也不替代 Reasonix。DeepSeek v4 Pro 的执行 harness、模型路由、缓存和凭据管理都由 [DeepSeek-Reasonix](https://github.com/esengine/DeepSeek-Reasonix) 提供；`crb` 只负责把它接进 Codex 的工作流。
+
+简单说：
+
+```text
+Reasonix runs DeepSeek -> crb makes it usable from Codex -> Codex applies the review
+```
+
+所以使用本仓库前，请先确保你已经安装并配置好 Reasonix CLI，或已经安装 Reasonix 桌面版（`crb` 会尝试自动使用桌面版内置 CLI）。如果两者都没有，`crb` 会报：
+
+```text
+Reasonix CLI not found. Install Reasonix.app or set REASONIX_BIN.
+```
+
+建议先验证 Reasonix 能单独工作：
+
+```bash
+reasonix --help
+reasonix run -m deepseek-v4-pro:cloud "reply reasonix-ok"
+```
+
+如果 `reasonix` 不在 PATH 中，但你知道 CLI 路径，可以用 `REASONIX_BIN` 指定：
+
+```bash
+REASONIX_BIN=/path/to/reasonix crb delegate --mode final-review --json "审一下这个方案"
 ```
 
 本仓库的 job / review / result 协议主要参照 [`openai/codex-plugin-cc`](https://github.com/openai/codex-plugin-cc)。完整拆解和后续对齐路线见 [docs/codex-plugin-cc-reference.md](docs/codex-plugin-cc-reference.md)。
@@ -25,7 +54,12 @@ MiMo 的相关能力（文案、中文表达、UI/UX 设计、前端反馈等）
 
 ## 30 秒快速开始
 
+先安装并配置 Reasonix。确认 `reasonix run -m deepseek-v4-pro:cloud ...` 能正常返回后，再安装 bridge：
+
 ```bash
+git clone https://github.com/enderzcx/codex-reasonix-bridge.git
+cd codex-reasonix-bridge
+npm test
 npm link
 ```
 
@@ -36,7 +70,7 @@ crb delegate --mode final-review --dry-run --json "审一下这个方案"
 # 预期：返回 deepseek-v4-pro:cloud 的路由信息，不调用模型
 ```
 
-进行真实 review 前，请确保本机 PATH 中有可用的 `reasonix` 可执行文件：
+进行真实 review：
 
 ```bash
 crb delegate --mode final-review --json "审一下这个方案有没有明显风险"
@@ -184,6 +218,8 @@ crb delegate --mode final-review --background --json \
 默认情况下，bridge 会用隔离的临时 HOME 启动 `reasonix run --no-config`，只继承必要 API key / base URL，不继承用户的 MCP、nowledge-mem 或全局 Reasonix 工具配置。这和 `codex-plugin-cc` 的受控 review runtime 是同一思路。确实需要完整 Reasonix runtime 时才使用 `--no-isolate-runtime`。
 
 ## 安装与配置
+
+本仓库只安装 `crb` 命令，不会替你安装 Reasonix，也不会直接配置 DeepSeek API key。Reasonix 的安装、模型配置和账号凭据请在 Reasonix 侧完成。
 
 ```bash
 git clone https://github.com/enderzcx/codex-reasonix-bridge.git

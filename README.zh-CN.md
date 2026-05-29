@@ -6,6 +6,7 @@
 
 主文档内容包括：
 
+- **前置依赖**：必须先安装并配置 Reasonix CLI 或 Reasonix 桌面版；`crb` 不是 DeepSeek provider，而是 Codex 调用 Reasonix / DeepSeek v4 Pro 的 bridge
 - **30 秒快速开始**：安装、dry-run 测试、首次调用
 - **模式 (Modes) 速查**：五种 review 模式的区别和用法
 - **结构化 review schema**：`final-review` / `engineering-feedback` / `daily-review` / `adversarial-review` 的 `verdict`、`findings`、`next_steps`
