@@ -6,6 +6,7 @@
 
 主文档内容包括：
 
+- **项目定位**：对标 [`openai/codex-plugin-cc`](https://github.com/openai/codex-plugin-cc) 的体验模型；plugin-cc 是 Claude Code 调 Codex，本仓库是 Codex 调 Reasonix / DeepSeek v4 Pro
 - **前置依赖**：必须先安装并配置 Reasonix CLI 或 Reasonix 桌面版；`crb` 不是 DeepSeek provider，而是 Codex 调用 Reasonix / DeepSeek v4 Pro 的 bridge
 - **30 秒快速开始**：安装、dry-run 测试、首次调用
 - **模式 (Modes) 速查**：五种 review 模式的区别和用法

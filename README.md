@@ -1,21 +1,32 @@
 # codex-reasonix-bridge
 
-> Codex 负责构建，Reasonix / DeepSeek v4 Pro 负责 review。
+> Use Reasonix / DeepSeek v4 Pro from inside Codex for engineering review, second opinions, and focused delegation.
 
-`codex-reasonix-bridge` 是给 **想让 Codex 和 DeepSeek v4 Pro 一起协作** 的开发者用的外部 bridge。它将 Codex 的工程计划、代码 diff、问题假设和最终判断交给 Reasonix / DeepSeek v4 Pro 进行独立审查。
+`codex-reasonix-bridge` 是给 **已经在用 Codex、但想把 Reasonix / DeepSeek v4 Pro 接进 Codex 工作流** 的开发者用的 bridge。
+
+它对标 [`openai/codex-plugin-cc`](https://github.com/openai/codex-plugin-cc) 的体验模型：plugin-cc 让 Claude Code 可以调用 Codex；本仓库让 Codex 可以调用 Reasonix / DeepSeek v4 Pro。工程 review 是当前最重要、最稳定的第一场景，但这个仓库的定位不是“只做 review”，而是 **Codex -> Reasonix** 的协作边界层。
 
 ```text
-Codex plans/builds -> bridge calls Reasonix / DeepSeek -> review -> Codex decides and verifies
+Codex plans/builds -> crb calls Reasonix -> DeepSeek v4 Pro responds -> Codex decides and verifies
 ```
 
-## 先说清楚：需要先安装 Reasonix
+## What You Get
+
+- `crb delegate`：从 Codex 会话里把工程问题交给 Reasonix / DeepSeek v4 Pro
+- `crb review`：像 plugin-cc 一样自动收集当前 git review context，再交给 DeepSeek 审查
+- `crb status` / `crb result` / `crb cancel`：管理后台任务，避免长 review 阻塞 Codex 主流程
+- `rendered` / `raw` / `result`：同时保留人类可读输出、原始模型输出和结构化 payload
+- JSON / fenced JSON / mixed output extraction：避免模型真实返回了内容，却被 bridge 误判成 “non-JSON”
+- Runtime isolation：Reasonix reviewer 只看你显式传入的 task、context、diff 和文件，不偷偷读 Codex 本地 workspace
+
+## Requirements: 先安装 Reasonix
 
 `crb` 本身不是 DeepSeek provider，也不替代 Reasonix。DeepSeek v4 Pro 的执行 harness、模型路由、缓存和凭据管理都由 [DeepSeek-Reasonix](https://github.com/esengine/DeepSeek-Reasonix) 提供；`crb` 只负责把它接进 Codex 的工作流。
 
 简单说：
 
 ```text
-Reasonix runs DeepSeek -> crb makes it usable from Codex -> Codex applies the review
+Reasonix runs DeepSeek -> crb makes it usable from Codex -> Codex applies the result
 ```
 
 所以使用本仓库前，请先确保你已经安装并配置好 Reasonix CLI，或已经安装 Reasonix 桌面版（`crb` 会尝试自动使用桌面版内置 CLI）。如果两者都没有，`crb` 会报：
@@ -43,12 +54,12 @@ REASONIX_BIN=/path/to/reasonix crb delegate --mode final-review --json "审一�
 
 ## 与 codex-mimo-skill 的分工
 
-MiMo 的相关能力（文案、中文表达、UI/UX 设计、前端反馈等）已独立拆分至 [`codex-mimo-skill`](https://github.com/enderzcx/codex-mimo-skill)。本仓库专注于工程 review。
+MiMo 的相关能力（文案、中文表达、UI/UX 设计、前端反馈等）已独立拆分至 [`codex-mimo-skill`](https://github.com/enderzcx/codex-mimo-skill)。本仓库专注于 Codex 调用 Reasonix / DeepSeek v4 Pro 做工程协作。
 
 | 仓库 | 模型 / Harness | 职责范围 |
 |---|---|---|
 | `codex-mimo-skill` | Codex 直接调用 MiMo | 文案、中文表达、UI/UX 设计、human feedback、前端代码首版 |
-| `codex-reasonix-bridge` | Reasonix / DeepSeek v4 Pro | 工程代码 review、独立第二意见、最终技术判断 |
+| `codex-reasonix-bridge` | Codex 调 Reasonix / DeepSeek v4 Pro | 工程 review、独立第二意见、focused delegation、最终技术判断 |
 
 **本仓库不再包含 MiMo provider，也不处理 UI 文案和前端代码生成。这些任务请使用 `codex-mimo-skill`。**
 

@@ -1,7 +1,7 @@
 {
   "name": "codex-reasonix-bridge",
   "version": "0.1.0",
-  "description": "Codex-first bridge for DeepSeek v4 Pro reviews through Reasonix/Ollama Cloud.",
+  "description": "Use Reasonix / DeepSeek v4 Pro from inside Codex for engineering review, second opinions, and focused delegation.",
   "type": "module",
   "bin": {
     "codex-reasonix-bridge": "./bin/codex-reasonix-bridge.mjs",
