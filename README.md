@@ -83,6 +83,16 @@ crb delegate --mode final-review --json \
   "只列 blocker/high risk 和必须补的验证"
 ```
 
+**像 codex-plugin-cc 一样自动收集 git review context：**
+
+```bash
+crb review --background --json "重点看 schema/migration/rollback 风险"
+crb status <job-id>
+crb result <job-id>
+```
+
+`crb review` 会自动判断当前工作树或 branch diff，并把 git status、diff、untracked text files 作为显式输入传给 Reasonix。这样 reviewer 不需要、也不能自己去读本地路径。
+
 ## 长时间 Review 使用后台 Job
 
 当 review 任务耗时较长，例如审查大型代码库或复杂架构方案时，建议使用后台 job 模式，避免 Codex 会话同步阻塞。后台 job 会在独立进程中运行，你可以通过命令管理其状态和结果。
@@ -113,6 +123,27 @@ crb delegate --mode final-review --background --json "审一下这个大型架�
 
 **最佳实践：**
 对于 `final-review` 等高价值模式，如果预计 review 时间较长，请优先使用 `--background`。前台模式适用于快速反馈场景，但长时间同步等待可能影响 Codex 的构建效率。
+
+## JSON 输出与输入边界
+
+Bridge 的 `--json` 会要求 Reasonix / DeepSeek 返回结构化 JSON。实际模型有时会在 JSON 外夹带日志、自然语言或 fenced code block；bridge 会尽量从 mixed output 中抽取符合 review contract 的 JSON，并把原始输出保存在后台 job 记录里，方便排查。
+
+**重要边界：Reasonix reviewer 不能读取 Codex 本地 workspace。**
+
+它只能看到命令里传入的 task、`--context` 和 `--input` 文件内容。做代码 / schema / 架构 review 时，请显式附上 diff、schema、计划或关键文件：
+
+```bash
+git diff > /tmp/change.diff
+crb delegate --mode final-review --background --json \
+  --input /tmp/change.diff \
+  "只审 blocker/high risk/missing tests；如果输入不够，标 [NEEDS_INPUT]"
+```
+
+如果是 review 当前 repo 改动，优先使用 `crb review --background --json`，让 bridge 脚本像 `openai/codex-plugin-cc` 一样先收集 git review target 再调用模型。
+
+如果 reviewer 说 `[NEEDS_INPUT]`，说明应该补传具体文件或更小的 targeted diff，而不是让模型去读本地路径、nowledge-mem 或隐藏 runtime。
+
+默认情况下，bridge 会用隔离的临时 HOME 启动 `reasonix run --no-config`，只继承必要 API key / base URL，不继承用户的 MCP、nowledge-mem 或全局 Reasonix 工具配置。这和 `codex-plugin-cc` 的受控 review runtime 是同一思路。确实需要完整 Reasonix runtime 时才使用 `--no-isolate-runtime`。
 
 ## 安装与配置
 

@@ -36,6 +36,9 @@ ${instruction}
 
 Hard contract:
 - Codex is the engineering executor and final reviewer.
+- You are running inside a constrained delegate call. You do not have access to Codex's local filesystem, nowledge-mem, browser, shell, MCP tools, hidden workspace state, or any runtime tools.
+- Review only the task, context, and attached file contents in this prompt. Do not claim you will read local files, call tools, inspect memory, or open paths that were not attached.
+- If the supplied input is insufficient, mark the gap as [NEEDS_INPUT] and list the exact diff/file/context Codex should attach next.
 - You may produce review findings, plans, risks, tests, rollback points, and structured recommendations.
 - Do not produce unconditional patches or claim code was changed.
 - Do not invent facts. Mark uncertain facts as [UNVERIFIED].
@@ -48,6 +51,11 @@ ${outputContract}`;
 
 export function buildUserPrompt({ task, contexts = [], files = [] }) {
   const parts = [];
+  parts.push("Runtime boundary:");
+  parts.push("- This Reasonix delegate call cannot access local files, nowledge-mem, shell, browser, MCP tools, or hidden Codex state.");
+  parts.push("- Treat only the task, context, and attached file blocks below as review input.");
+  parts.push("- If an attached file is truncated or a required file is missing, say [NEEDS_INPUT] and name the exact missing input. Do not infer hidden code.");
+  parts.push("");
   parts.push("Task:");
   parts.push(task || "(no explicit task; infer from context and attached files)");
   if (contexts.length > 0) {

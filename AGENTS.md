@@ -23,6 +23,11 @@ DeepSeek review workflow outside core.
 - Use `crb delegate --mode final-review --background --json "<task>"` for non-trivial G2/G3 review, large diffs, schema review, or architecture review.
 - Manage background jobs with `crb status <job-id>`, `crb result <job-id>`, and `crb cancel <job-id>`.
 - Foreground Reasonix calls have a 180000ms default timeout and should be used only for quick checks.
+- Reasonix cannot read Codex's local workspace, nowledge-mem, browser, shell, or hidden runtime through this bridge. Always attach the actual diff/schema/file/plan with `--input` or inline context.
+- For current repo code review, prefer `crb review --background --json "<focus>"`; it follows `openai/codex-plugin-cc` by collecting the git review target before calling the model.
+- If a reviewer needs missing material, it must say `[NEEDS_INPUT]`; do not design prompts that tell Reasonix to inspect local paths directly.
+- `--json` output may contain Reasonix logs or fenced JSON. The bridge must extract structured JSON robustly while preserving raw output in background job records.
+- Default Reasonix calls must isolate runtime with temporary HOME + `reasonix run --no-config`; only pass `--no-isolate-runtime` for explicit debugging.
 
 ## Verification
 

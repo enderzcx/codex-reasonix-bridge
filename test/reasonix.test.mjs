@@ -36,3 +36,52 @@ setTimeout(() => {
     /timed out after 30ms/,
   );
 });
+
+test("runReasonix isolates Reasonix config and MCP runtime by default", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "crb-isolate-"));
+  const fakeReasonix = join(dir, "reasonix");
+  writeFileSync(
+    fakeReasonix,
+    `#!/usr/bin/env node
+console.log(JSON.stringify({
+  argv: process.argv.slice(2),
+  home: process.env.HOME,
+  userprofile: process.env.USERPROFILE
+}));
+`,
+  );
+  chmodSync(fakeReasonix, 0o755);
+
+  const result = await runReasonix({
+    reasonixBin: fakeReasonix,
+    model: "deepseek-v4-pro:cloud",
+    prompt: "ping",
+    timeoutMs: 1000,
+  });
+  const payload = JSON.parse(result.stdout);
+  assert.ok(payload.argv.includes("--no-config"));
+  assert.match(payload.home, /crb-reasonix-home-/);
+  assert.equal(payload.home, payload.userprofile);
+});
+
+test("runReasonix can opt out of isolated runtime", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "crb-no-isolate-"));
+  const fakeReasonix = join(dir, "reasonix");
+  writeFileSync(
+    fakeReasonix,
+    `#!/usr/bin/env node
+console.log(JSON.stringify({ argv: process.argv.slice(2) }));
+`,
+  );
+  chmodSync(fakeReasonix, 0o755);
+
+  const result = await runReasonix({
+    reasonixBin: fakeReasonix,
+    model: "deepseek-v4-pro:cloud",
+    prompt: "ping",
+    timeoutMs: 1000,
+    isolateRuntime: false,
+  });
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.argv.includes("--no-config"), false);
+});

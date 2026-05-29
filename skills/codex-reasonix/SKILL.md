@@ -38,6 +38,14 @@ codex-reasonix-bridge delegate --mode final-review --json \
   "从 blocker、风险、测试缺口角度审这个改动"
 ```
 
+For current repo diffs, prefer the codex-plugin-cc-style review command:
+
+```bash
+crb review --background --json "重点看 schema/migration/rollback 风险"
+```
+
+It collects git status, diff, and small untracked text files before calling Reasonix, so the reviewer gets explicit evidence instead of trying to inspect local paths.
+
 ## Modes
 
 - `engineering-feedback`: DeepSeek v4 Pro second opinion on Codex's engineering plan or diff
@@ -63,6 +71,31 @@ Manage:
 - `crb cancel <job-id>`: cancel the job
 
 Foreground mode has a default timeout of 180000ms and is best for quick review. Background mode defaults to no timeout unless `--timeout-ms` is explicitly passed. For `final-review` or any large G2/G3 review, prefer `--background`.
+
+## Input Boundary
+
+Reasonix / DeepSeek does not have Codex's local tools or workspace runtime inside this bridge call. It cannot read local paths, nowledge-mem, shell output, browser state, or hidden files unless Codex attaches them.
+
+For code, schema, architecture, or PR review, attach the actual material:
+
+```bash
+git diff > /tmp/change.diff
+crb delegate --mode final-review --background --json \
+  --input /tmp/change.diff \
+  "审 blocker/high risk/missing tests；输入不够就标 [NEEDS_INPUT]"
+```
+
+For current git changes, use:
+
+```bash
+crb review --background --json "审 blocker/high risk/missing tests"
+```
+
+If the result says `[NEEDS_INPUT]`, attach the requested file/diff/context and rerun. Do not ask Reasonix to inspect local paths directly.
+
+`--json` results may come back with model logs or markdown fences around the JSON. The bridge extracts the structured review JSON when possible and stores raw output in background job records for debugging.
+
+By default the bridge starts `reasonix run --no-config` under a temporary HOME and only carries necessary API key / base URL env through. This keeps user MCP, nowledge-mem, and global Reasonix tools out of the reviewer runtime. Use `--no-isolate-runtime` only when explicitly debugging the full Reasonix environment.
 
 ## Discipline
 

@@ -1,12 +1,14 @@
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
+import { join } from "node:path";
 
 const APP_NODE = "/Applications/Reasonix.app/Contents/Resources/node";
 const APP_CLI = "/Applications/Reasonix.app/Contents/Resources/dist/cli/index.js";
 export const DEFAULT_TIMEOUT_MS = 180_000;
 
-export async function runDelegateModel({ reasonixBin, model, effort, system, prompt, noProxy = false, timeoutMs }) {
-  return runReasonix({ reasonixBin, model, effort, system, prompt, noProxy, timeoutMs });
+export async function runDelegateModel({ reasonixBin, model, effort, system, prompt, noProxy = false, timeoutMs, isolateRuntime = true }) {
+  return runReasonix({ reasonixBin, model, effort, system, prompt, noProxy, timeoutMs, isolateRuntime });
 }
 
 export function resolveReasonixCommand(reasonixBin = process.env.REASONIX_BIN) {
@@ -28,17 +30,19 @@ export function resolveTimeoutMs(value = process.env.CRB_TIMEOUT_MS ?? process.e
   return parsed;
 }
 
-export async function runReasonix({ reasonixBin, model, effort, system, prompt, noProxy = false, timeoutMs = resolveTimeoutMs() }) {
+export async function runReasonix({ reasonixBin, model, effort, system, prompt, noProxy = false, timeoutMs = resolveTimeoutMs(), isolateRuntime = true }) {
   const command = resolveReasonixCommand(reasonixBin);
   const args = [...command.slice(1), "run", "-m", model];
   if (effort) args.push("--effort", effort);
   if (system) args.push("--system", system);
   if (noProxy) args.push("--no-proxy");
+  if (isolateRuntime) args.push("--no-config");
   args.push(prompt);
 
+  const isolatedHome = isolateRuntime ? mkdtempSync(join(tmpdir(), "crb-reasonix-home-")) : null;
   const child = spawn(command[0], args, {
     stdio: ["ignore", "pipe", "pipe"],
-    env: process.env,
+    env: buildReasonixEnv({ isolateRuntime, isolatedHome }),
   });
 
   let stdout = "";
@@ -70,6 +74,9 @@ export async function runReasonix({ reasonixBin, model, effort, system, prompt, 
   });
   if (timer) clearTimeout(timer);
   if (forceKillTimer) clearTimeout(forceKillTimer);
+  if (isolatedHome) {
+    rmSync(isolatedHome, { recursive: true, force: true });
+  }
 
   if (timedOut) {
     const partial = stderr.trim() || stdout.trim();
@@ -86,4 +93,34 @@ export async function runReasonix({ reasonixBin, model, effort, system, prompt, 
     throw new Error(`Reasonix run failed: ${detail}`);
   }
   return { stdout, stderr };
+}
+
+function buildReasonixEnv({ isolateRuntime, isolatedHome }) {
+  if (!isolateRuntime) return process.env;
+  return {
+    ...process.env,
+    ...readReasonixCredentialEnv(),
+    ...(isolatedHome ? { HOME: isolatedHome, USERPROFILE: isolatedHome } : {}),
+  };
+}
+
+function readReasonixCredentialEnv() {
+  const env = {};
+  try {
+    const raw = readFileSync(join(homedir(), ".reasonix", "config.json"), "utf8");
+    const cfg = JSON.parse(raw);
+    if (!process.env.DEEPSEEK_API_KEY && typeof cfg.apiKey === "string" && cfg.apiKey) {
+      env.DEEPSEEK_API_KEY = cfg.apiKey;
+    }
+    if (!process.env.DEEPSEEK_BASE_URL && !process.env.DEEPSEEK_API_BASE_URL && typeof cfg.baseUrl === "string" && cfg.baseUrl) {
+      env.DEEPSEEK_BASE_URL = cfg.baseUrl;
+    }
+    if (!process.env.OLLAMA_API_KEY && typeof cfg.ollamaApiKey === "string" && cfg.ollamaApiKey) {
+      env.OLLAMA_API_KEY = cfg.ollamaApiKey;
+      env.ollamaApiKey = cfg.ollamaApiKey;
+    }
+  } catch {
+    // Best-effort only. Reasonix will still read explicit env vars or local .env.
+  }
+  return env;
 }

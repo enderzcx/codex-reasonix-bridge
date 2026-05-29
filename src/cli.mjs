@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { stat } from "node:fs/promises";
 import { stdin, stdout } from "node:process";
+import { collectReviewContext, resolveReviewTarget } from "./git-context.mjs";
 import { buildSystemPrompt, buildUserPrompt } from "./prompts.mjs";
 import { runDelegateModel } from "./reasonix.mjs";
 import { DELEGATE_MODES, MODEL_CATALOG, normalizeMode, resolveRoute, routeMetadata } from "./routes.mjs";
@@ -30,6 +31,10 @@ export async function main(argv) {
   }
   if (command === "delegate") {
     await delegate(rest);
+    return;
+  }
+  if (command === "review") {
+    await review(rest);
     return;
   }
   if (command === "job-worker") {
@@ -62,10 +67,13 @@ export async function main(argv) {
 export async function delegate(argv) {
   const opts = parseDelegateArgs(argv);
   const task = opts.task || (await readStdinIfPiped());
+  await runPreparedDelegate({ opts, task, files: opts.inputFiles.map(readInputFile) });
+}
+
+async function runPreparedDelegate({ opts, task, files }) {
   const mode = normalizeMode(opts.mode);
   const route = resolveRoute({ mode, model: opts.model });
   const metadata = routeMetadata(route);
-  const files = opts.inputFiles.map(readInputFile);
 
   if (opts.dryRun) {
     writeJson({
@@ -87,6 +95,42 @@ export async function delegate(argv) {
   else writeText(output.raw);
 }
 
+export async function review(argv) {
+  const opts = parseReviewArgs(argv);
+  const target = resolveReviewTarget(process.cwd(), { base: opts.base, scope: opts.scope });
+  const reviewContext = collectReviewContext(process.cwd(), target);
+  const task = [
+    opts.task || "Review the attached git context for material blockers, high-risk regressions, and missing tests.",
+    "",
+    "Important:",
+    "- The attached git context is the review input collected by crb, following the codex-plugin-cc pattern.",
+    "- If the attached context is truncated or insufficient, say [NEEDS_INPUT] and name the exact missing file/diff/context.",
+  ].join("\n");
+  const files = [{
+    path: reviewContext.path,
+    content: reviewContext.content,
+    bytes: reviewContext.bytes,
+    truncated: reviewContext.truncated,
+  }];
+  const contexts = [
+    `review target: ${target.label}`,
+    `repo root: ${reviewContext.repoRoot}`,
+    reviewContext.summary,
+    reviewContext.truncated
+      ? `review context truncated from ${reviewContext.bytes} bytes to ${Buffer.byteLength(reviewContext.content, "utf8")} bytes`
+      : `review context bytes: ${reviewContext.bytes}`,
+  ];
+  await runPreparedDelegate({
+    opts: {
+      ...opts,
+      contexts: [...contexts, ...opts.contexts],
+      inputFiles: [],
+    },
+    task,
+    files,
+  });
+}
+
 async function runDelegateRequest({ opts, task, mode, route, metadata, files }) {
   const system = buildSystemPrompt(mode, opts.json);
   const prompt = buildUserPrompt({ task, contexts: opts.contexts, files });
@@ -99,6 +143,7 @@ async function runDelegateRequest({ opts, task, mode, route, metadata, files }) 
     json: opts.json,
     noProxy: opts.noProxy,
     timeoutMs: opts.timeoutMs,
+    isolateRuntime: opts.isolateRuntime,
   });
 
   return {
@@ -135,6 +180,7 @@ function enqueueBackgroundDelegate({ opts, task, mode, route, metadata, files })
         contexts: opts.contexts,
         json: true,
         noProxy: opts.noProxy,
+        isolateRuntime: opts.isolateRuntime,
         model: opts.model,
         effort: opts.effort,
         reasonixBin: opts.reasonixBin,
@@ -181,6 +227,7 @@ export function parseDelegateArgs(argv) {
     dryRun: false,
     background: false,
     noProxy: false,
+    isolateRuntime: true,
     model: undefined,
     effort: undefined,
     reasonixBin: undefined,
@@ -197,12 +244,56 @@ export function parseDelegateArgs(argv) {
     else if (arg === "--dry-run") opts.dryRun = true;
     else if (arg === "--background") opts.background = true;
     else if (arg === "--no-proxy") opts.noProxy = true;
+    else if (arg === "--no-isolate-runtime") opts.isolateRuntime = false;
     else if (arg === "--model" || arg === "-m") opts.model = requireValue(argv, ++i, arg);
     else if (arg === "--effort") opts.effort = requireValue(argv, ++i, "--effort");
     else if (arg === "--timeout-ms") opts.timeoutMs = parseTimeoutMs(requireValue(argv, ++i, "--timeout-ms"));
     else if (arg === "--reasonix-bin") opts.reasonixBin = requireValue(argv, ++i, "--reasonix-bin");
     else if (arg === "--help" || arg === "-h") {
       printDelegateHelp();
+      process.exit(0);
+    } else positional.push(arg);
+  }
+  opts.task = positional.join(" ").trim();
+  return opts;
+}
+
+export function parseReviewArgs(argv) {
+  const opts = {
+    mode: "final-review",
+    scope: "auto",
+    base: undefined,
+    inputFiles: [],
+    contexts: [],
+    json: false,
+    dryRun: false,
+    background: false,
+    noProxy: false,
+    isolateRuntime: true,
+    model: undefined,
+    effort: undefined,
+    reasonixBin: undefined,
+    timeoutMs: undefined,
+    task: "",
+  };
+  const positional = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--mode") opts.mode = requireValue(argv, ++i, "--mode");
+    else if (arg === "--scope") opts.scope = requireValue(argv, ++i, "--scope");
+    else if (arg === "--base") opts.base = requireValue(argv, ++i, "--base");
+    else if (arg === "--context") opts.contexts.push(requireValue(argv, ++i, "--context"));
+    else if (arg === "--json") opts.json = true;
+    else if (arg === "--dry-run") opts.dryRun = true;
+    else if (arg === "--background") opts.background = true;
+    else if (arg === "--no-proxy") opts.noProxy = true;
+    else if (arg === "--no-isolate-runtime") opts.isolateRuntime = false;
+    else if (arg === "--model" || arg === "-m") opts.model = requireValue(argv, ++i, arg);
+    else if (arg === "--effort") opts.effort = requireValue(argv, ++i, "--effort");
+    else if (arg === "--timeout-ms") opts.timeoutMs = parseTimeoutMs(requireValue(argv, ++i, "--timeout-ms"));
+    else if (arg === "--reasonix-bin") opts.reasonixBin = requireValue(argv, ++i, "--reasonix-bin");
+    else if (arg === "--help" || arg === "-h") {
+      printReviewHelp();
       process.exit(0);
     } else positional.push(arg);
   }
@@ -380,14 +471,20 @@ async function readStdinIfPiped() {
 }
 
 export function wrapJsonOutput(raw, mode, routing) {
-  const parsed = parseJsonObject(raw);
-  if (parsed) {
+  const extracted = extractJsonObject(raw);
+  if (extracted?.parsed) {
+    const parsed = extracted.parsed;
+    const notes = Array.isArray(parsed.notes) ? [...parsed.notes] : [];
+    if (extracted.source !== "direct") {
+      notes.push("Bridge extracted structured JSON from mixed Reasonix output.");
+    }
     return {
       mode,
       routing,
       ...parsed,
       mode: parsed.mode ?? mode,
       routing,
+      ...(notes.length ? { notes } : {}),
     };
   }
   return {
@@ -400,22 +497,110 @@ export function wrapJsonOutput(raw, mode, routing) {
   };
 }
 
-function parseJsonObject(raw) {
-  const trimmed = raw.trim();
+export function extractJsonObject(raw) {
+  const trimmed = stripAnsi(String(raw ?? "")).trim();
   if (!trimmed) return null;
+  const direct = parseJsonCandidate(trimmed);
+  if (direct) return { parsed: direct, source: "direct" };
+
+  const fencedCandidates = extractFencedCandidates(trimmed);
+  const fenced = chooseBestParsedObject(fencedCandidates, { minScore: 1 });
+  if (fenced) return { parsed: fenced, source: "fenced" };
+
+  const balanced = chooseBestParsedObject(extractBalancedObjectCandidates(trimmed), { minScore: 1 });
+  if (balanced) return { parsed: balanced, source: "balanced" };
+
+  return null;
+}
+
+function stripAnsi(value) {
+  return value.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "");
+}
+
+function parseJsonCandidate(candidate) {
   try {
-    const parsed = JSON.parse(trimmed);
+    const parsed = JSON.parse(candidate.trim());
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
   } catch {
-    const match = trimmed.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    try {
-      const parsed = JSON.parse(match[0]);
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
-    } catch {
-      return null;
+    return null;
+  }
+}
+
+function extractFencedCandidates(raw) {
+  const candidates = [];
+  const fencePattern = /```(?:json|JSON)?\s*([\s\S]*?)```/g;
+  let match;
+  while ((match = fencePattern.exec(raw)) !== null) {
+    if (match[1]?.trim()) candidates.push(match[1].trim());
+  }
+  return candidates;
+}
+
+function extractBalancedObjectCandidates(raw) {
+  const candidates = [];
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+    if (char === "{") {
+      if (depth === 0) start = index;
+      depth += 1;
+      continue;
+    }
+    if (char === "}" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start >= 0) {
+        candidates.push(raw.slice(start, index + 1));
+        start = -1;
+      }
     }
   }
+  return candidates;
+}
+
+function chooseBestParsedObject(candidates, { minScore = 0 } = {}) {
+  let best = null;
+  for (const candidate of candidates) {
+    const parsed = parseJsonCandidate(candidate);
+    if (!parsed) continue;
+    const score = scoreParsedObject(parsed);
+    if (score < minScore) continue;
+    if (!best || score > best.score || (score === best.score && candidate.length > best.length)) {
+      best = { parsed, score, length: candidate.length };
+    }
+  }
+  return best?.parsed ?? null;
+}
+
+function scoreParsedObject(value) {
+  let score = 0;
+  if (typeof value.summary === "string") score += 4;
+  if (Array.isArray(value.deliverables)) score += 4;
+  if (Array.isArray(value.next_for_codex)) score += 3;
+  if (Array.isArray(value.notes)) score += 2;
+  if (typeof value.verdict === "string") score += 2;
+  if (Array.isArray(value.findings)) score += 2;
+  if (typeof value.mode === "string") score += 1;
+  if (value.routing && typeof value.routing === "object") score += 1;
+  return score;
 }
 
 function writeJson(value) {
@@ -431,6 +616,7 @@ function printHelp() {
 
 Commands:
   delegate [task]   Ask Reasonix / DeepSeek for engineering review or final judgment.
+  review [focus]    Collect git context like codex-plugin-cc, then ask Reasonix for review.
   status [job-id]   Show background review jobs.
   result [job-id]   Show a completed background review result.
   cancel [job-id]   Cancel an active background review.
@@ -438,6 +624,7 @@ Commands:
   models            Print model catalog JSON.
 
 Run "codex-reasonix-bridge delegate --help" for delegate options.
+Run "codex-reasonix-bridge review --help" for git review options.
 `);
 }
 
@@ -457,5 +644,27 @@ Options:
   --dry-run              Print route metadata without calling Reasonix.
   --reasonix-bin <path>  Override Reasonix executable.
   --no-proxy             Pass --no-proxy to Reasonix.
+  --no-isolate-runtime   Let Reasonix read normal ~/.reasonix config and MCP tools. Not recommended for review.
+`);
+}
+
+function printReviewHelp() {
+  stdout.write(`Usage:
+  codex-reasonix-bridge review [options] [focus text]
+
+Options:
+  --scope <scope>        auto | working-tree | branch. Default: auto.
+  --base <ref>           Review branch diff against a base ref.
+  --mode <mode>          final-review | daily-review | engineering-feedback. Default: final-review.
+  --context <text>       Add short context; repeatable.
+  --json                 Ask for and emit stable JSON.
+  --background           Run as a tracked background job. Recommended for non-trivial reviews.
+  -m, --model <id>       Override routed model.
+  --effort <level>       low | medium | high | max.
+  --timeout-ms <ms>      Kill a stuck Reasonix run after this many ms. Default: 180000.
+  --dry-run              Print collected route/input metadata without calling Reasonix.
+  --reasonix-bin <path>  Override Reasonix executable.
+  --no-proxy             Pass --no-proxy to Reasonix.
+  --no-isolate-runtime   Let Reasonix read normal ~/.reasonix config and MCP tools. Not recommended for review.
 `);
 }

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeMode, normalizeModelId, resolveRoute, routeMetadata } from "../src/routes.mjs";
 import { buildSystemPrompt, buildUserPrompt } from "../src/prompts.mjs";
-import { parseDelegateArgs, wrapJsonOutput } from "../src/cli.mjs";
+import { parseDelegateArgs, parseReviewArgs, wrapJsonOutput } from "../src/cli.mjs";
 
 test("normalizes review modes and DeepSeek aliases", () => {
   assert.equal(normalizeMode("review"), "final-review");
@@ -35,6 +35,8 @@ test("falls back to available review models when provided", () => {
 test("system prompt keeps bridge in reviewer role", () => {
   const prompt = buildSystemPrompt("final-review", true);
   assert.match(prompt, /Codex is the engineering executor/);
+  assert.match(prompt, /do not have access to Codex's local filesystem/);
+  assert.match(prompt, /nowledge-mem/);
   assert.match(prompt, /Do not produce unconditional patches/);
   assert.match(prompt, /codex-mimo-skill/);
   assert.match(prompt, /Return ONLY a valid JSON object/);
@@ -49,6 +51,8 @@ test("user prompt includes context and attached files", () => {
   assert.match(prompt, /review landing implementation/);
   assert.match(prompt, /Chinese builders/);
   assert.match(prompt, /--- \/tmp\/a.diff ---/);
+  assert.match(prompt, /cannot access local files/);
+  assert.match(prompt, /\[NEEDS_INPUT\]/);
 });
 
 test("wraps non-json output in stable JSON", () => {
@@ -59,10 +63,64 @@ test("wraps non-json output in stable JSON", () => {
   assert.equal(wrapped.deliverables[0].content, "hello");
 });
 
+test("extracts fenced JSON from mixed Reasonix output", () => {
+  const route = resolveRoute({ mode: "final-review" });
+  const wrapped = wrapJsonOutput(
+    [
+      "Queued final-review with deepseek-v4-pro:cloud",
+      "Worker completed",
+      "```json",
+      JSON.stringify({
+        summary: "schema review found one blocker",
+        deliverables: [{ type: "review", title: "blocker", content: "missing FK" }],
+        notes: [],
+        next_for_codex: ["attach migration diff"],
+      }),
+      "```",
+    ].join("\n"),
+    "final-review",
+    routeMetadata(route),
+  );
+  assert.equal(wrapped.summary, "schema review found one blocker");
+  assert.equal(wrapped.deliverables[0].content, "missing FK");
+  assert.match(wrapped.notes.at(-1), /extracted structured JSON/);
+});
+
+test("extracts best balanced JSON object from noisy logs", () => {
+  const route = resolveRoute({ mode: "final-review" });
+  const wrapped = wrapJsonOutput(
+    [
+      '{"event":"worker-started"}',
+      "DeepSeek review:",
+      JSON.stringify({
+        summary: "looks good",
+        deliverables: [],
+        notes: ["no blocker"],
+        next_for_codex: [],
+      }),
+      "done",
+    ].join("\n"),
+    "final-review",
+    routeMetadata(route),
+  );
+  assert.equal(wrapped.summary, "looks good");
+  assert.deepEqual(wrapped.next_for_codex, []);
+});
+
 test("parses background and timeout delegate controls", () => {
   const opts = parseDelegateArgs(["--background", "--timeout-ms", "0", "--mode", "final-review", "review this"]);
   assert.equal(opts.background, true);
   assert.equal(opts.timeoutMs, 0);
   assert.equal(opts.mode, "final-review");
   assert.equal(opts.task, "review this");
+});
+
+test("parses git review controls", () => {
+  const opts = parseReviewArgs(["--background", "--scope", "working-tree", "--base", "main", "--json", "focus on migrations"]);
+  assert.equal(opts.background, true);
+  assert.equal(opts.scope, "working-tree");
+  assert.equal(opts.base, "main");
+  assert.equal(opts.json, true);
+  assert.equal(opts.mode, "final-review");
+  assert.equal(opts.task, "focus on migrations");
 });
