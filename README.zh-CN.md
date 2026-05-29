@@ -8,6 +8,8 @@
 
 - **30 秒快速开始**：安装、dry-run 测试、首次调用
 - **模式 (Modes) 速查**：五种 review 模式的区别和用法
+- **结构化 review schema**：`final-review` / `engineering-feedback` / `daily-review` / `adversarial-review` 的 `verdict`、`findings`、`next_steps`
+- **结果处理契约**：后台 job 保存 `result`、`rendered`、`raw`；`crb result` 默认返回 rendered 输出
 - **职责边界**：本仓库与 [`codex-mimo-skill`](https://github.com/enderzcx/codex-mimo-skill) 的明确分工
 - **常用命令**：针对 diff review、计划审查等场景的示例
 - **架构原则**：为何保持外部 bridge，以及 upstream PR 方向

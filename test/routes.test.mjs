@@ -6,6 +6,7 @@ import { parseDelegateArgs, parseReviewArgs, wrapJsonOutput } from "../src/cli.m
 
 test("normalizes review modes and DeepSeek aliases", () => {
   assert.equal(normalizeMode("review"), "final-review");
+  assert.equal(normalizeMode("challenge"), "adversarial-review");
   assert.equal(normalizeMode("eng-plan"), "engineering-plan");
   assert.equal(normalizeModelId("v4-pro"), "deepseek-v4-pro:cloud");
   assert.equal(normalizeModelId("deepseek-v4-flash"), "deepseek-v4-flash:cloud");
@@ -16,6 +17,7 @@ test("routes review and engineering judgment to DeepSeek v4 Pro", () => {
   assert.equal(resolveRoute({ mode: "engineering-plan" }).model, "deepseek-v4-pro:cloud");
   assert.equal(resolveRoute({ mode: "daily-review" }).model, "deepseek-v4-pro:cloud");
   assert.equal(resolveRoute({ mode: "final-review" }).model, "deepseek-v4-pro:cloud");
+  assert.equal(resolveRoute({ mode: "adversarial-review" }).model, "deepseek-v4-pro:cloud");
 });
 
 test("rejects MiMo-owned modes after split", () => {
@@ -40,6 +42,8 @@ test("system prompt keeps bridge in reviewer role", () => {
   assert.match(prompt, /Do not produce unconditional patches/);
   assert.match(prompt, /codex-mimo-skill/);
   assert.match(prompt, /Return ONLY a valid JSON object/);
+  assert.match(prompt, /"verdict": "approve\|needs-attention"/);
+  assert.match(prompt, /"findings"/);
 });
 
 test("user prompt includes context and attached files", () => {
@@ -60,6 +64,7 @@ test("wraps non-json output in stable JSON", () => {
   const wrapped = wrapJsonOutput("hello", "final-review", routeMetadata(route));
   assert.equal(wrapped.mode, "final-review");
   assert.equal(wrapped.routing.provider, "reasonix");
+  assert.equal(wrapped.parse_status, "raw-fallback");
   assert.equal(wrapped.deliverables[0].content, "hello");
 });
 
@@ -71,10 +76,19 @@ test("extracts fenced JSON from mixed Reasonix output", () => {
       "Worker completed",
       "```json",
       JSON.stringify({
+        verdict: "needs-attention",
         summary: "schema review found one blocker",
-        deliverables: [{ type: "review", title: "blocker", content: "missing FK" }],
-        notes: [],
-        next_for_codex: ["attach migration diff"],
+        findings: [{
+          severity: "blocker",
+          title: "Missing FK",
+          body: "migration omits relation constraint",
+          file: "schema.prisma",
+          line_start: 12,
+          line_end: 12,
+          confidence: "high",
+          recommendation: "add relation constraint",
+        }],
+        next_steps: ["attach migration diff"],
       }),
       "```",
     ].join("\n"),
@@ -82,7 +96,9 @@ test("extracts fenced JSON from mixed Reasonix output", () => {
     routeMetadata(route),
   );
   assert.equal(wrapped.summary, "schema review found one blocker");
-  assert.equal(wrapped.deliverables[0].content, "missing FK");
+  assert.equal(wrapped.parse_status, "extracted");
+  assert.equal(wrapped.parse_source, "fenced");
+  assert.equal(wrapped.findings[0].title, "Missing FK");
   assert.match(wrapped.notes.at(-1), /extracted structured JSON/);
 });
 
@@ -93,10 +109,10 @@ test("extracts best balanced JSON object from noisy logs", () => {
       '{"event":"worker-started"}',
       "DeepSeek review:",
       JSON.stringify({
+        verdict: "approve",
         summary: "looks good",
-        deliverables: [],
-        notes: ["no blocker"],
-        next_for_codex: [],
+        findings: [],
+        next_steps: [],
       }),
       "done",
     ].join("\n"),
@@ -104,7 +120,24 @@ test("extracts best balanced JSON object from noisy logs", () => {
     routeMetadata(route),
   );
   assert.equal(wrapped.summary, "looks good");
-  assert.deepEqual(wrapped.next_for_codex, []);
+  assert.deepEqual(wrapped.next_steps, []);
+});
+
+test("preserves raw output when structured review JSON fails schema validation", () => {
+  const route = resolveRoute({ mode: "final-review" });
+  const wrapped = wrapJsonOutput(
+    JSON.stringify({
+      summary: "missing required fields",
+      findings: [{ severity: "urgent" }],
+      next_steps: [],
+    }),
+    "final-review",
+    routeMetadata(route),
+  );
+  assert.equal(wrapped.parse_status, "schema-fallback");
+  assert.match(wrapped.summary, /did not match the review schema/);
+  assert.match(wrapped.notes.join("\n"), /verdict must be approve/);
+  assert.match(wrapped.deliverables[0].content, /missing required fields/);
 });
 
 test("parses background and timeout delegate controls", () => {

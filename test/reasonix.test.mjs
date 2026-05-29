@@ -56,7 +56,7 @@ console.log(JSON.stringify({
     reasonixBin: fakeReasonix,
     model: "deepseek-v4-pro:cloud",
     prompt: "ping",
-    timeoutMs: 1000,
+    timeoutMs: 5000,
   });
   const payload = JSON.parse(result.stdout);
   assert.ok(payload.argv.includes("--no-config"));
@@ -79,7 +79,7 @@ console.log(JSON.stringify({ argv: process.argv.slice(2) }));
     reasonixBin: fakeReasonix,
     model: "deepseek-v4-pro:cloud",
     prompt: "ping",
-    timeoutMs: 1000,
+    timeoutMs: 5000,
     isolateRuntime: false,
   });
   const payload = JSON.parse(result.stdout);

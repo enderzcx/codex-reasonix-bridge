@@ -15,6 +15,12 @@ Use this skill when Codex needs an external engineering reviewer:
 
 For copy, Chinese expression, UI/UX taste, visual briefs, human feedback, or frontend first-pass work, use `codex-mimo` instead. MiMo no longer belongs in this Reasonix bridge.
 
+Companion docs in this skill:
+
+- [runtime.md](runtime.md): exact command/runtime rules
+- [result-handling.md](result-handling.md): how to relay rendered/raw output
+- [prompt-templates.md](prompt-templates.md): safe delegation prompt templates
+
 ## Command
 
 Prefer:
@@ -52,6 +58,7 @@ It collects git status, diff, and small untracked text files before calling Reas
 - `engineering-plan`: DeepSeek v4 Pro review of Codex's implementation plan and verification strategy
 - `daily-review`: DeepSeek v4 Pro daily second opinion
 - `final-review`: high-confidence final judgment
+- `adversarial-review`: focused challenge review for wrong assumptions, hidden risks, counterexamples, rollback gaps, and missing verification
 - `general`: mixed Reasonix review fallback
 
 ## Long Reviews
@@ -67,7 +74,8 @@ crb delegate --mode final-review --background --json "审一下这个大型变�
 Manage:
 
 - `crb status`: view job status
-- `crb result <job-id>`: get the result
+- `crb result <job-id>`: get the rendered result
+- `crb result --json <job-id>`: get the full job record, including `result`, `rendered`, `raw`, and errors
 - `crb cancel <job-id>`: cancel the job
 
 Foreground mode has a default timeout of 180000ms and is best for quick review. Background mode defaults to no timeout unless `--timeout-ms` is explicitly passed. For `final-review` or any large G2/G3 review, prefer `--background`.
@@ -95,6 +103,8 @@ If the result says `[NEEDS_INPUT]`, attach the requested file/diff/context and r
 
 `--json` results may come back with model logs or markdown fences around the JSON. The bridge extracts the structured review JSON when possible and stores raw output in background job records for debugging.
 
+For `final-review`, `engineering-feedback`, `daily-review`, and `adversarial-review`, the structured result follows `schemas/review-output.schema.json`: `verdict`, `summary`, `findings[]`, and `next_steps[]`. If schema validation fails, the bridge must preserve and render raw model output instead of discarding it.
+
 By default the bridge starts `reasonix run --no-config` under a temporary HOME and only carries necessary API key / base URL env through. This keeps user MCP, nowledge-mem, and global Reasonix tools out of the reviewer runtime. Use `--no-isolate-runtime` only when explicitly debugging the full Reasonix environment.
 
 ## Discipline
@@ -103,9 +113,10 @@ Reasonix output is review input, not an unconditional patch.
 
 Codex must:
 
-1. Summarize which mode was called.
-2. State the main review findings.
-3. Say what was applied or intentionally ignored.
-4. Verify any code/UI changes itself.
+1. State which command and mode were called.
+2. Read `crb result <job-id>` or the foreground JSON before summarizing.
+3. Preserve blocker/high findings and `[NEEDS_INPUT]` requests; do not summarize them away.
+4. Say what Codex applied or intentionally ignored.
+5. Verify any code/UI changes itself.
 
 If Reasonix cannot be called, state the exact command attempted and the error, then continue with Codex's own judgment instead of pretending Reasonix was consulted.

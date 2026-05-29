@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/enderzcx/codex-reasonix-bridge/schemas/review-output.schema.json",
+  "title": "Codex Reasonix Review Output",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["verdict", "summary", "findings", "next_steps"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["approve", "needs-attention"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["severity", "title", "body", "confidence", "recommendation"],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["blocker", "high", "medium", "low", "info"]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1
+          },
+          "file": {
+            "type": ["string", "null"]
+          },
+          "line_start": {
+            "type": ["integer", "null"],
+            "minimum": 1
+          },
+          "line_end": {
+            "type": ["integer", "null"],
+            "minimum": 1
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "recommendation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "next_steps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

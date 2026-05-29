@@ -3,8 +3,8 @@ lifetime:     long-term
 failure_cost: 我重跑
 default_mode: G2
 
-last_action:  2026-05-27 initialized standalone bridge repo
-next:         smoke test, git init, then decide GitHub remote
+last_action:  2026-05-29 implemented plugin-cc-style result reliability, structured review schema, raw fallback, pruning, adversarial review, and docs contract
+next:         run smoke/install checks, then push if desired
 blockers:     none
 
 observability: skip (reason: local CLI bridge, no hosted service yet)

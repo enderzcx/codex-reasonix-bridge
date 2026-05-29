@@ -5,7 +5,9 @@ import { stat } from "node:fs/promises";
 import { stdin, stdout } from "node:process";
 import { collectReviewContext, resolveReviewTarget } from "./git-context.mjs";
 import { buildSystemPrompt, buildUserPrompt } from "./prompts.mjs";
+import { renderDelegateResult } from "./render.mjs";
 import { runDelegateModel } from "./reasonix.mjs";
+import { isStructuredReviewMode, validateReviewOutput } from "./review-schema.mjs";
 import { DELEGATE_MODES, MODEL_CATALOG, normalizeMode, resolveRoute, routeMetadata } from "./routes.mjs";
 import {
   appendLog,
@@ -146,10 +148,12 @@ async function runDelegateRequest({ opts, task, mode, route, metadata, files }) 
     isolateRuntime: opts.isolateRuntime,
   });
 
+  const wrapped = wrapJsonOutput(result.stdout, mode, metadata);
   return {
     raw: result.stdout,
     stderr: result.stderr,
-    wrapped: wrapJsonOutput(result.stdout, mode, metadata),
+    wrapped,
+    rendered: renderDelegateResult(wrapped, { raw: result.stdout }),
   };
 }
 
@@ -318,10 +322,12 @@ async function jobWorker(argv) {
       pid: null,
       completedAt: nowIso(),
       result: output.wrapped,
+      rendered: output.rendered,
       raw: output.raw,
       stderr: output.stderr,
       summary: output.wrapped.summary ?? "Reasonix review completed.",
     });
+    appendParseStatusLog(cwd, jobId, output.wrapped);
     appendLog(cwd, jobId, "Worker completed.");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -334,6 +340,16 @@ async function jobWorker(argv) {
     });
     appendLog(cwd, jobId, `Worker failed: ${message}`);
     process.exitCode = 1;
+  }
+}
+
+function appendParseStatusLog(cwd, jobId, result) {
+  const status = result?.parse_status;
+  if (!status) return;
+  if (status === "raw-fallback" || status === "schema-fallback") {
+    appendLog(cwd, jobId, `Output parse status: ${status}; raw output preserved in job record.`);
+  } else {
+    appendLog(cwd, jobId, `Output parse status: ${status}${result?.parse_source ? ` (${result.parse_source})` : ""}.`);
   }
 }
 
@@ -377,7 +393,7 @@ function result(argv) {
     writeText(`Job ${stored.id} failed: ${stored.error ?? "unknown error"}`);
     return;
   }
-  writeJson(stored.result ?? { summary: stored.summary ?? "No result payload stored." });
+  writeText(stored.rendered ?? renderDelegateResult(stored.result ?? { summary: stored.summary ?? "No result payload stored." }, { raw: stored.raw }));
 }
 
 function cancel(argv) {
@@ -478,18 +494,47 @@ export function wrapJsonOutput(raw, mode, routing) {
     if (extracted.source !== "direct") {
       notes.push("Bridge extracted structured JSON from mixed Reasonix output.");
     }
+    if (isStructuredReviewMode(mode)) {
+      const validation = validateReviewOutput(parsed);
+      if (!validation.ok) {
+        return {
+          mode,
+          routing,
+          parse_status: "schema-fallback",
+          parse_source: extracted.source,
+          summary: "Delegate model returned JSON that did not match the review schema.",
+          deliverables: [{ type: "note", title: "raw", content: raw.trim() }],
+          notes: [
+            "The bridge preserved the raw response because review schema validation failed.",
+            ...validation.errors,
+            ...notes,
+          ],
+          next_for_codex: [],
+        };
+      }
+      return {
+        ...validation.value,
+        mode: parsed.mode ?? mode,
+        routing,
+        parse_status: extracted.source === "direct" ? "parsed" : "extracted",
+        parse_source: extracted.source,
+        ...(notes.length ? { notes } : {}),
+      };
+    }
     return {
-      mode,
-      routing,
       ...parsed,
       mode: parsed.mode ?? mode,
       routing,
+      parse_status: extracted.source === "direct" ? "parsed" : "extracted",
+      parse_source: extracted.source,
       ...(notes.length ? { notes } : {}),
     };
   }
   return {
     mode,
     routing,
+    parse_status: "raw-fallback",
+    parse_source: "raw",
     summary: "Delegate model returned non-JSON content.",
     deliverables: [{ type: "note", title: "raw", content: raw.trim() }],
     notes: ["The bridge wrapped the raw response because JSON parsing failed."],
@@ -655,7 +700,7 @@ function printReviewHelp() {
 Options:
   --scope <scope>        auto | working-tree | branch. Default: auto.
   --base <ref>           Review branch diff against a base ref.
-  --mode <mode>          final-review | daily-review | engineering-feedback. Default: final-review.
+  --mode <mode>          final-review | adversarial-review | daily-review | engineering-feedback. Default: final-review.
   --context <text>       Add short context; repeatable.
   --json                 Ask for and emit stable JSON.
   --background           Run as a tracked background job. Recommended for non-trivial reviews.

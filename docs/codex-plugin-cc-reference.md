@@ -11,6 +11,12 @@ Local reference commit: `807e03ac9d5aa23bc395fdec8c3767500a86b3cf`
 
 This document records how `openai/codex-plugin-cc` is structured, and how `codex-reasonix-bridge` / `codex-mimo-skill` should borrow the useful parts without copying the wrong responsibility model.
 
+Current implementation status:
+
+- Phase 1 result reliability is implemented for both `crb` and `cmi`: job records keep `result`, `rendered`, and `raw`; result commands return rendered output by default; raw fallback is preserved on parse failure; old job artifacts are pruned.
+- Phase 2 structured review is implemented for `crb` review modes: [schemas/review-output.schema.json](../schemas/review-output.schema.json), schema validation, finding rendering, raw fallback on schema failure, and `adversarial-review`.
+- Phase 3 misuse prevention is partially implemented through stronger README/SKILL/AGENTS result-handling rules and doc/contract tests. Full plugin packaging remains optional.
+
 ## Conclusion
 
 `codex-plugin-cc` is not just a CLI wrapper. It is a full delegation boundary:
@@ -82,10 +88,10 @@ Our adaptation:
 - Skills should say: relay raw findings before summarizing, and never pretend a model was called.
 - For long review or long UI/copy generation, use `--background`.
 
-Gap:
+Implemented now:
 
-- We need stronger result-handling docs for both `crb` and `cmi`.
-- We should add tests that assert README/SKILL examples keep the thin-forwarder contract.
+- Result-handling docs now state that `result` output is source-of-truth and that raw fallback must be relayed when parsing fails.
+- Contract tests cover `result` rendering and background commands returning immediately.
 
 ### 3. Companion Runtime Layer
 
@@ -116,10 +122,10 @@ What we already copied well:
 - Review-context collection for `crb review`.
 - Isolation around Reasonix runtime.
 
-Gap:
+Implemented now:
 
-- The companion in `codex-plugin-cc` has a clearer separation between raw payload and rendered text.
-- Our job records should keep both machine payload and human-rendered result.
+- Both tools store machine `result`, human `rendered`, and original `raw` in completed background jobs.
+- `result <job-id>` returns `rendered`; `result --json <job-id>` returns the full job record.
 
 ### 4. Runtime Adapter Layer
 
@@ -199,11 +205,11 @@ Our adaptation:
 
 - `crb` and `cmi` already have background jobs.
 
-Gap:
+Implemented now:
 
-- Add pruning.
-- Store a stable `rendered` field.
-- Expose parse errors and raw model output in a consistent way.
+- State saving prunes old job JSON/log artifacts outside the retained index.
+- Stable `rendered` fields are stored for both tools.
+- `raw-fallback` and `schema-fallback` keep raw output visible.
 
 ### 7. Structured Review Layer
 
@@ -241,11 +247,12 @@ Our adaptation:
 
 - `crb --json` already extracts JSON from mixed/fenced output.
 
-Gap:
+Implemented now:
 
-- Add a formal `review-output.schema.json`.
-- Make review modes render consistent finding tables.
-- Keep raw output visible when schema validation fails.
+- `schemas/review-output.schema.json` defines `verdict`, `summary`, `findings[]`, and `next_steps[]`.
+- `src/review-schema.mjs` validates review JSON without local filesystem access.
+- `src/render.mjs` renders severity, file/line, confidence, recommendation, and next steps.
+- Schema failures render raw model output instead of dropping the review.
 
 ### 8. Hook / Gate Layer
 
@@ -268,7 +275,7 @@ Our adaptation:
 - Do not make MiMo or DeepSeek auto-run for every task.
 - Only use automatic gates for high-value review paths.
 
-Gap:
+Current status:
 
 - We can integrate `crb final-review` with an explicit review artifact gate later.
 - Do not add a global MiMo hook. Copy/design review should be triggered by task type, not every turn.
@@ -294,10 +301,10 @@ Our adaptation:
   - result handling rules
   - prompt template rules
 
-Gap:
+Implemented now:
 
-- Today each skill mixes all three concerns.
-- That is readable, but weaker as a hard operating contract.
+- The installed skill docs now have explicit result-handling discipline, and global/workspace AGENTS.md documents the same contract.
+- Full physical split into multiple skills remains optional unless sessions continue to misuse the tools.
 
 ### 10. Test Contract Layer
 
@@ -323,10 +330,10 @@ Our adaptation:
 
 - Keep unit tests around route/model selection, env loading, job state, git context, and JSON extraction.
 
-Gap:
+Implemented now:
 
-- Add doc-contract tests for README/SKILL examples.
-- Add render tests after introducing `rendered`.
+- Render tests cover parsed and raw-fallback output.
+- CLI contract tests cover background immediate return and `result` returning rendered output.
 
 ## What This Means For crb
 
@@ -344,14 +351,14 @@ Keep:
 - isolated runtime
 - explicit git context
 
-Add next:
+Implemented:
 
 1. Formal review schema and validator.
 2. Stable human renderer.
 3. Raw-output fallback on parse failure.
 4. Job pruning.
 5. Doc-contract tests for command examples and result handling.
-6. Optional `adversarial-review` alias/mode for focused challenge review.
+6. `adversarial-review` alias/mode for focused challenge review.
 
 Do not add:
 
@@ -373,13 +380,16 @@ Keep:
 - `.env` fallback for MiMo key
 - mode-specific prompts
 
-Add next:
+Implemented:
 
 1. Stable rendered result per mode.
 2. Raw-output fallback.
-3. Optional JSON schemas for `frontend-ux-plan`, `ui-review-cn`, and `human-feedback`.
-4. Job pruning.
-5. Result-handling skill text that says MiMo output is a brief or candidate, not an automatic patch.
+3. Job pruning.
+4. Result-handling skill text that says MiMo output is a brief or candidate, not an automatic patch.
+
+Deferred:
+
+- Optional JSON schemas for `frontend-ux-plan`, `ui-review-cn`, and `human-feedback`. MiMo remains a brief/candidate generator, so raw fallback plus Codex verification is enough for now.
 
 Do not add:
 
@@ -389,7 +399,7 @@ Do not add:
 
 ## Recommended Roadmap
 
-### Phase 1: Make Results Trustworthy
+### Phase 1: Make Results Trustworthy (implemented)
 
 Scope:
 
@@ -408,7 +418,7 @@ Disable when:
 
 - One-off local experiments where no background job is used.
 
-### Phase 2: Make Review Structured
+### Phase 2: Make Review Structured (implemented for crb review modes)
 
 Scope:
 
@@ -428,7 +438,7 @@ Disable when:
 - The user only asks for a loose brainstorming second opinion.
 - Input does not include enough source context to attach file/line findings.
 
-### Phase 3: Make Skills Harder To Misuse
+### Phase 3: Make Skills Harder To Misuse (implemented as docs/AGENTS contract)
 
 Scope:
 
@@ -445,7 +455,7 @@ Disable when:
 
 - A repo has its own stricter AGENTS.md or project-specific workflow.
 
-### Phase 4: Optional Plugin Packaging
+### Phase 4: Optional Plugin Packaging (deferred)
 
 Scope:
 

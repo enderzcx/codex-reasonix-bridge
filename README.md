@@ -10,6 +10,8 @@ Codex plans/builds -> bridge calls Reasonix / DeepSeek -> review -> Codex decide
 
 本仓库的 job / review / result 协议主要参照 [`openai/codex-plugin-cc`](https://github.com/openai/codex-plugin-cc)。完整拆解和后续对齐路线见 [docs/codex-plugin-cc-reference.md](docs/codex-plugin-cc-reference.md)。
 
+当前结果契约已经按 plugin-cc 思路加固：后台 job 同时保存 `result`（结构化 payload）、`rendered`（人类可读输出）和 `raw`（原始模型输出）。`crb result <job-id>` 默认返回 `rendered`，`crb result --json <job-id>` 返回完整 job 记录。
+
 ## 与 codex-mimo-skill 的分工
 
 MiMo 的相关能力（文案、中文表达、UI/UX 设计、前端反馈等）已独立拆分至 [`codex-mimo-skill`](https://github.com/enderzcx/codex-mimo-skill)。本仓库专注于工程 review。
@@ -56,6 +58,7 @@ REASONIX_BIN=/path/to/reasonix crb delegate --mode final-review --json "审一�
 | `engineering-plan` | `deepseek-v4-pro:cloud` | 审查 Codex 的实现计划、验证策略和回滚方案 |
 | `daily-review` | `deepseek-v4-pro:cloud` | 日常开发中的快速 second opinion |
 | `final-review` | `deepseek-v4-pro:cloud` | 高价值变更前的最终、权威判断 |
+| `adversarial-review` | `deepseek-v4-pro:cloud` | 反方挑战审查，专找错误假设、隐藏风险、反例和回滚缺口 |
 | `general` | `deepseek-v4-flash:cloud` | 低成本、通用的混合 review |
 
 ## 常用命令示例
@@ -85,6 +88,14 @@ crb delegate --mode final-review --json \
   "只列 blocker/high risk 和必须补的验证"
 ```
 
+**请求反方挑战：**
+
+```bash
+crb delegate --mode adversarial-review --json \
+  --input /tmp/change.diff \
+  "主动找反例、错误假设、隐藏风险和没验证的边界"
+```
+
 **像 codex-plugin-cc 一样自动收集 git review context：**
 
 ```bash
@@ -108,7 +119,8 @@ crb delegate --mode final-review --background --json "审一下这个大型架�
 **管理后台 job：**
 
 - `crb status`：查看所有后台 job 的状态
-- `crb result <job-id>`：获取指定 job 的 review 结果
+- `crb result <job-id>`：获取指定 job 的 rendered review 结果
+- `crb result --json <job-id>`：获取完整 job 记录，包括 `result`、`rendered`、`raw` 和错误信息
 - `crb cancel <job-id>`：取消正在运行的后台 job
 
 **前台模式（默认）：**
@@ -129,6 +141,30 @@ crb delegate --mode final-review --background --json "审一下这个大型架�
 ## JSON 输出与输入边界
 
 Bridge 的 `--json` 会要求 Reasonix / DeepSeek 返回结构化 JSON。实际模型有时会在 JSON 外夹带日志、自然语言或 fenced code block；bridge 会尽量从 mixed output 中抽取符合 review contract 的 JSON，并把原始输出保存在后台 job 记录里，方便排查。
+
+`final-review`、`engineering-feedback`、`daily-review` 和 `adversarial-review` 使用正式 review schema，定义在 [schemas/review-output.schema.json](schemas/review-output.schema.json)：
+
+```json
+{
+  "verdict": "approve|needs-attention",
+  "summary": "one sentence",
+  "findings": [
+    {
+      "severity": "blocker|high|medium|low|info",
+      "title": "short title",
+      "body": "specific evidence and impact",
+      "file": "path or null",
+      "line_start": 123,
+      "line_end": 123,
+      "confidence": "high|medium|low",
+      "recommendation": "concrete fix or next check"
+    }
+  ],
+  "next_steps": ["concrete next action"]
+}
+```
+
+如果模型返回 fenced/mixed JSON，bridge 会抽取并校验；如果校验失败或不是 JSON，`parse_status` 会变成 `schema-fallback` 或 `raw-fallback`，`rendered` 会显示原始输出，避免其他 Codex session 把一次真实 review 误判成“模型没返回”。
 
 **重要边界：Reasonix reviewer 不能读取 Codex 本地 workspace。**
 

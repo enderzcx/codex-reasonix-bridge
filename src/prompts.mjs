@@ -3,6 +3,7 @@ const MODE_TITLES = {
   "engineering-plan": "Codex 工程计划二意见 reviewer",
   "daily-review": "日常快速 review 协作者",
   "final-review": "最终判断 reviewer",
+  "adversarial-review": "反方挑战 reviewer",
   general: "Reasonix review 协作者",
 };
 
@@ -11,21 +12,45 @@ const MODE_INSTRUCTIONS = {
   "engineering-plan": "基于 Codex 已给出的工程计划做二意见：指出风险、边界缺口、验证命令、回滚点和遗漏步骤。不要取代 Codex 直接拍板，不要直接改代码。",
   "daily-review": "快速 review Codex 的计划、diff 或判断，找明显问题、缺口和改进建议。",
   "final-review": "做最终判断，优先指出 blocker 和高风险问题。",
+  "adversarial-review": "做 focused challenge review：主动寻找反例、隐藏风险、错误假设、未验证边界和回滚缺口。不要为了平衡而淡化 blocker。",
   general: "根据任务给工程 review、风险复盘或二意见。Codex 是唯一实现者。",
 };
+
+const STRUCTURED_REVIEW_MODES = new Set(["engineering-feedback", "daily-review", "final-review", "adversarial-review"]);
 
 export function buildSystemPrompt(mode, json = false) {
   const title = MODE_TITLES[mode] ?? MODE_TITLES.general;
   const instruction = MODE_INSTRUCTIONS[mode] ?? MODE_INSTRUCTIONS.general;
-  const outputContract = json
-    ? `Return ONLY a valid JSON object with:
+  const outputContract = json && STRUCTURED_REVIEW_MODES.has(mode)
+    ? `Return ONLY a valid JSON object that matches this review schema:
+{
+  "verdict": "approve|needs-attention",
+  "summary": "one sentence",
+  "findings": [
+    {
+      "severity": "blocker|high|medium|low|info",
+      "title": "short finding title",
+      "body": "specific evidence and impact",
+      "file": "path or null",
+      "line_start": 123,
+      "line_end": 123,
+      "confidence": "high|medium|low",
+      "recommendation": "concrete fix or next check"
+    }
+  ],
+  "next_steps": ["concrete next action"]
+}
+
+Use "approve" only when there are no blocker/high material concerns. Use null for file/line fields when the attached input has no exact location.`
+    : json
+      ? `Return ONLY a valid JSON object with:
 {
   "summary": "one sentence",
   "deliverables": [{"type": "review|plan|note", "title": "short title", "content": "markdown"}],
   "notes": ["short caveat"],
   "next_for_codex": ["concrete next action"]
 }`
-    : "Return concise Markdown. Put blockers and high-risk findings first, caveats second.";
+      : "Return concise Markdown. Put blockers and high-risk findings first, caveats second.";
 
   return `Role: ${title}
 

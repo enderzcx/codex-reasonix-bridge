@@ -3,6 +3,7 @@ export const DELEGATE_MODES = [
   "engineering-plan",
   "daily-review",
   "final-review",
+  "adversarial-review",
   "general",
 ];
 
@@ -66,6 +67,12 @@ export const MODE_ROUTES = {
     outputKind: "review",
     rationale: "Final review 固定 DeepSeek v4 Pro；Codex 仍保留最终工程裁决权。",
   },
+  "adversarial-review": {
+    primaryModel: "deepseek-v4-pro:cloud",
+    fallbackModels: ["glm-5.1:cloud", "deepseek-v4-flash:cloud"],
+    outputKind: "review",
+    rationale: "Focused challenge review：主动寻找反例、隐藏风险、错误假设和缺失验证。",
+  },
   general: {
     primaryModel: "deepseek-v4-flash:cloud",
     fallbackModels: ["deepseek-v4-pro:cloud", "minimax-m2.7:cloud"],
@@ -88,6 +95,9 @@ const modeAliases = new Map([
   ["plan", "engineering-plan"],
   ["code-review", "final-review"],
   ["review", "final-review"],
+  ["adversarial", "adversarial-review"],
+  ["challenge-review", "adversarial-review"],
+  ["challenge", "adversarial-review"],
 ]);
 
 export function normalizeModelId(model) {
