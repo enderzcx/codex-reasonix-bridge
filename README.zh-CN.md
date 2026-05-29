@@ -11,3 +11,4 @@
 - **职责边界**：本仓库与 [`codex-mimo-skill`](https://github.com/enderzcx/codex-mimo-skill) 的明确分工
 - **常用命令**：针对 diff review、计划审查等场景的示例
 - **架构原则**：为何保持外部 bridge，以及 upstream PR 方向
+- **plugin-cc 对标**：完整参照 [`openai/codex-plugin-cc`](https://github.com/openai/codex-plugin-cc) 的 command / runtime / job / schema / hook 分层，详见 [docs/codex-plugin-cc-reference.md](docs/codex-plugin-cc-reference.md)

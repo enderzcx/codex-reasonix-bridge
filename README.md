@@ -8,6 +8,8 @@
 Codex plans/builds -> bridge calls Reasonix / DeepSeek -> review -> Codex decides and verifies
 ```
 
+本仓库的 job / review / result 协议主要参照 [`openai/codex-plugin-cc`](https://github.com/openai/codex-plugin-cc)。完整拆解和后续对齐路线见 [docs/codex-plugin-cc-reference.md](docs/codex-plugin-cc-reference.md)。
+
 ## 与 codex-mimo-skill 的分工
 
 MiMo 的相关能力（文案、中文表达、UI/UX 设计、前端反馈等）已独立拆分至 [`codex-mimo-skill`](https://github.com/enderzcx/codex-mimo-skill)。本仓库专注于工程 review。
