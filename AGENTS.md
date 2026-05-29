@@ -6,20 +6,22 @@
 
 It exists because Reasonix upstream wants core to remain DeepSeek-first,
 cache-first, and single-model-loop oriented. This bridge keeps Codex-specific
-DeepSeek review workflow outside core.
+DeepSeek consultation/review workflow outside core.
 
 ## Working Rules
 
 - Keep the bridge external. Do not vendor or fork Reasonix core.
 - Prefer stable `reasonix run` as the execution boundary.
-- Reasonix-side models may produce engineering reviews, risk notes, plans, and final judgment.
+- Reasonix-side models may produce engineering consultation, reviews, risk notes, plans, and final judgment.
 - Codex remains the only engineering executor and final code reviewer.
 - Add modes only when they map to a real Codex workflow.
 - Avoid product claims that imply official Reasonix ownership.
 - Do not add MiMo, copywriting, UI/UX, human-feedback, or frontend-first-pass routing here.
 - MiMo work belongs in the sibling repo `codex-mimo-skill`.
-- DeepSeek v4 Pro owns engineering/final review here.
+- DeepSeek v4 Pro owns engineering consultation and final review here.
+- Use `crb consult --json "<question>"` or `crb ask --json "<question>"` for pure Codex <-> Reasonix discussion that should not force a review schema.
 - Follow the `openai/codex-plugin-cc` pattern for long review: use tracked background jobs instead of blocking the main session.
+- Use `crb consult --background --json "<question>"` for non-trivial engineering discussion or focused delegation.
 - Use `crb delegate --mode final-review --background --json "<task>"` for non-trivial G2/G3 review, large diffs, schema review, or architecture review.
 - Use `crb delegate --mode adversarial-review --background --json "<task>"` when the goal is to challenge assumptions, find counterexamples, and stress rollback/verification.
 - Manage background jobs with `crb status <job-id>`, `crb result <job-id>`, and `crb cancel <job-id>`.

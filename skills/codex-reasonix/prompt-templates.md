@@ -1,5 +1,11 @@
 # Prompt Templates
 
+Consult:
+
+```text
+商量一下这个问题，给取舍、推荐路径和 Codex 下一步。不要默认进入 review schema；输入不够就标 [NEEDS_INPUT]。
+```
+
 Final review:
 
 ```text

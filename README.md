@@ -12,6 +12,7 @@ Codex plans/builds -> crb calls Reasonix -> DeepSeek v4 Pro responds -> Codex de
 
 ## What You Get
 
+- `crb consult` / `crb ask`：从 Codex 会话里和 Reasonix / DeepSeek v4 Pro 单纯商量工程问题
 - `crb delegate`：从 Codex 会话里把工程问题交给 Reasonix / DeepSeek v4 Pro
 - `crb review`：像 plugin-cc 一样自动收集当前 git review context，再交给 DeepSeek 审查
 - `crb status` / `crb result` / `crb cancel`：管理后台任务，避免长 review 阻塞 Codex 主流程
@@ -87,6 +88,13 @@ crb delegate --mode final-review --dry-run --json "审一下这个方案"
 crb delegate --mode final-review --json "审一下这个方案有没有明显风险"
 ```
 
+单纯商量问题，不进入 review schema：
+
+```bash
+crb consult --json "这个 auth 方案应该走 session 还是 JWT？请给取舍和下一步建议"
+crb ask --json "这个 API 错误处理怎么收敛更合理？"
+```
+
 如果 `reasonix` 不在系统 PATH 中，可以通过环境变量指定其路径：
 
 ```bash
@@ -95,18 +103,27 @@ REASONIX_BIN=/path/to/reasonix crb delegate --mode final-review --json "审一�
 
 ## 可用模式 (Modes)
 
-每个模式对应一个特定的 review 场景。关键 review 默认使用 `deepseek-v4-pro:cloud`；低成本通用任务使用 `deepseek-v4-flash:cloud`。
+每个模式对应一个特定协作场景。`consult` 和关键 review 默认使用 `deepseek-v4-pro:cloud`；低成本通用任务使用 `deepseek-v4-flash:cloud`。
 
 | 模式 | 默认模型 | 典型用途 |
 |---|---|---|
+| `consult` | `deepseek-v4-pro:cloud` | 纯商量、第二意见、focused delegation，不强制 review schema |
 | `engineering-feedback` | `deepseek-v4-pro:cloud` | 对 Codex 提交的方案或代码 diff 进行工程层面的反馈 |
 | `engineering-plan` | `deepseek-v4-pro:cloud` | 审查 Codex 的实现计划、验证策略和回滚方案 |
 | `daily-review` | `deepseek-v4-pro:cloud` | 日常开发中的快速 second opinion |
 | `final-review` | `deepseek-v4-pro:cloud` | 高价值变更前的最终、权威判断 |
 | `adversarial-review` | `deepseek-v4-pro:cloud` | 反方挑战审查，专找错误假设、隐藏风险、反例和回滚缺口 |
-| `general` | `deepseek-v4-flash:cloud` | 低成本、通用的混合 review |
+| `general` | `deepseek-v4-flash:cloud` | 低成本、通用的混合咨询 fallback |
 
 ## 常用命令示例
+
+**单纯商量工程问题：**
+
+```bash
+crb consult --json \
+  --context "gravity: G2; Codex will implement" \
+  "这个后台 job runtime 应该保留 foreground fallback 吗？列取舍和建议"
+```
 
 **获取工程第二意见：**
 
@@ -151,9 +168,15 @@ crb result <job-id>
 
 `crb review` 会自动判断当前工作树或 branch diff，并把 git status、diff、untracked text files 作为显式输入传给 Reasonix。这样 reviewer 不需要、也不能自己去读本地路径。
 
-## 长时间 Review 使用后台 Job
+## 长时间任务使用后台 Job
 
-当 review 任务耗时较长，例如审查大型代码库或复杂架构方案时，建议使用后台 job 模式，避免 Codex 会话同步阻塞。后台 job 会在独立进程中运行，你可以通过命令管理其状态和结果。
+当 consult/review 任务耗时较长，例如商量复杂架构方案、审查大型 diff 或跑最终判断时，建议使用后台 job 模式，避免 Codex 会话同步阻塞。后台 job 会在独立进程中运行，你可以通过命令管理其状态和结果。
+
+**启动后台 consult：**
+
+```bash
+crb consult --background --json "商量一下这个多 agent 协作协议怎么收敛"
+```
 
 **启动后台 review：**
 
@@ -185,7 +208,7 @@ crb delegate --mode final-review --background --json "审一下这个大型架�
 
 ## JSON 输出与输入边界
 
-Bridge 的 `--json` 会要求 Reasonix / DeepSeek 返回结构化 JSON。实际模型有时会在 JSON 外夹带日志、自然语言或 fenced code block；bridge 会尽量从 mixed output 中抽取符合 review contract 的 JSON，并把原始输出保存在后台 job 记录里，方便排查。
+Bridge 的 `--json` 会要求 Reasonix / DeepSeek 返回结构化 JSON。实际模型有时会在 JSON 外夹带日志、自然语言或 fenced code block；bridge 会尽量从 mixed output 中抽取符合当前 mode contract 的 JSON，并把原始输出保存在后台 job 记录里，方便排查。
 
 `final-review`、`engineering-feedback`、`daily-review` 和 `adversarial-review` 使用正式 review schema，定义在 [schemas/review-output.schema.json](schemas/review-output.schema.json)：
 

@@ -1,4 +1,5 @@
 export const DELEGATE_MODES = [
+  "consult",
   "engineering-feedback",
   "engineering-plan",
   "daily-review",
@@ -43,6 +44,12 @@ export const MODEL_CATALOG = [
 ];
 
 export const MODE_ROUTES = {
+  consult: {
+    primaryModel: "deepseek-v4-pro:cloud",
+    fallbackModels: ["deepseek-v4-flash:cloud", "glm-5.1:cloud", "minimax-m2.7:cloud"],
+    outputKind: "discussion",
+    rationale: "Pure Codex <-> Reasonix consultation：用于商量问题、第二视角、focused delegation；Codex 仍负责最终执行。",
+  },
   "engineering-feedback": {
     primaryModel: "deepseek-v4-pro:cloud",
     fallbackModels: ["glm-5.1:cloud", "minimax-m2.7:cloud", "deepseek-v4-flash:cloud"],
@@ -76,8 +83,8 @@ export const MODE_ROUTES = {
   general: {
     primaryModel: "deepseek-v4-flash:cloud",
     fallbackModels: ["deepseek-v4-pro:cloud", "minimax-m2.7:cloud"],
-    outputKind: "review",
-    rationale: "混合 review 默认低成本；重要判断显式使用 final-review。",
+    outputKind: "discussion",
+    rationale: "低成本混合咨询 fallback；重要判断显式使用 consult 或 final-review。",
   },
 };
 
@@ -90,6 +97,12 @@ for (const model of MODEL_CATALOG) {
 }
 
 const modeAliases = new Map([
+  ["ask", "consult"],
+  ["chat", "consult"],
+  ["discuss", "consult"],
+  ["discussion", "consult"],
+  ["rescue", "consult"],
+  ["second-opinion", "consult"],
   ["eng-feedback", "engineering-feedback"],
   ["eng-plan", "engineering-plan"],
   ["plan", "engineering-plan"],

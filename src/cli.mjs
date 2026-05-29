@@ -35,6 +35,10 @@ export async function main(argv) {
     await delegate(rest);
     return;
   }
+  if (command === "consult" || command === "ask") {
+    await consult(rest);
+    return;
+  }
   if (command === "review") {
     await review(rest);
     return;
@@ -68,6 +72,12 @@ export async function main(argv) {
 
 export async function delegate(argv) {
   const opts = parseDelegateArgs(argv);
+  const task = opts.task || (await readStdinIfPiped());
+  await runPreparedDelegate({ opts, task, files: opts.inputFiles.map(readInputFile) });
+}
+
+export async function consult(argv) {
+  const opts = parseDelegateArgs(["--mode", "consult", ...argv]);
   const task = opts.task || (await readStdinIfPiped());
   await runPreparedDelegate({ opts, task, files: opts.inputFiles.map(readInputFile) });
 }
@@ -165,7 +175,7 @@ function writeText(value) {
 function enqueueBackgroundDelegate({ opts, task, mode, route, metadata, files }) {
   const cwd = resolve(process.cwd());
   const workspaceRoot = resolveWorkspaceRoot(cwd);
-  const jobId = generateJobId("review");
+  const jobId = generateJobId(metadata.output_kind === "discussion" ? "consult" : "review");
   const logFile = resolveJobLogFile(workspaceRoot, jobId);
   const job = createJob(workspaceRoot, {
     id: jobId,
@@ -219,7 +229,7 @@ function enqueueBackgroundDelegate({ opts, task, mode, route, metadata, files })
     },
   };
   if (opts.json) writeJson(payload);
-  else writeText(`Reasonix review started in the background as ${jobId}. Check \`crb status ${jobId}\` for progress.`);
+  else writeText(`Reasonix delegate started in the background as ${jobId}. Check \`crb status ${jobId}\` for progress.`);
 }
 
 export function parseDelegateArgs(argv) {
@@ -325,7 +335,7 @@ async function jobWorker(argv) {
       rendered: output.rendered,
       raw: output.raw,
       stderr: output.stderr,
-      summary: output.wrapped.summary ?? "Reasonix review completed.",
+      summary: output.wrapped.summary ?? "Reasonix delegate completed.",
     });
     appendParseStatusLog(cwd, jobId, output.wrapped);
     appendLog(cwd, jobId, "Worker completed.");
@@ -660,11 +670,13 @@ function printHelp() {
   stdout.write(`codex-reasonix-bridge
 
 Commands:
-  delegate [task]   Ask Reasonix / DeepSeek for engineering review or final judgment.
+  consult [task]    Ask Reasonix / DeepSeek to discuss a question with Codex.
+  ask [task]        Alias for consult.
+  delegate [task]   Ask Reasonix / DeepSeek for consultation, review, or final judgment.
   review [focus]    Collect git context like codex-plugin-cc, then ask Reasonix for review.
-  status [job-id]   Show background review jobs.
-  result [job-id]   Show a completed background review result.
-  cancel [job-id]   Cancel an active background review.
+  status [job-id]   Show background jobs.
+  result [job-id]   Show a completed background result.
+  cancel [job-id]   Cancel an active background job.
   modes             List delegate modes.
   models            Print model catalog JSON.
 
@@ -682,7 +694,7 @@ Options:
   --input <path>         Attach an input file; repeatable.
   --context <text>       Add short context; repeatable.
   --json                 Ask for and emit stable JSON.
-  --background           Run as a tracked background job. Use for non-trivial reviews.
+  --background           Run as a tracked background job. Use for non-trivial consult/review tasks.
   -m, --model <id>       Override routed model.
   --effort <level>       low | medium | high | max.
   --timeout-ms <ms>      Kill a stuck Reasonix run after this many ms. Default: 180000.

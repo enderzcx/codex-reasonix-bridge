@@ -1,12 +1,13 @@
 ---
 name: codex-reasonix
-description: Use Reasonix / DeepSeek v4 Pro from Codex for engineering second opinions, plan review, daily review, and final judgment.
+description: Use Reasonix / DeepSeek v4 Pro from Codex for engineering consultation, second opinions, plan review, daily review, and final judgment.
 ---
 
 # codex-reasonix
 
-Use this skill when Codex needs an external engineering reviewer:
+Use this skill when Codex needs Reasonix / DeepSeek v4 Pro as an external engineering collaborator:
 
+- discuss an engineering problem without forcing a review schema
 - review a Codex implementation plan
 - review a diff for bugs, regressions, or missing tests
 - get a second opinion on a root-cause hypothesis
@@ -26,6 +27,7 @@ Companion docs in this skill:
 Prefer:
 
 ```bash
+crb consult --json "<question>"
 codex-reasonix-bridge delegate --mode <mode> --json "<task>"
 ```
 
@@ -33,6 +35,13 @@ Short alias:
 
 ```bash
 crb delegate --mode <mode> --json "<task>"
+```
+
+Use `consult` / `ask` for pure discussion:
+
+```bash
+crb consult --json "这个 auth 方案应该走 session 还是 JWT？请给取舍和下一步建议"
+crb ask --json "这个 API 错误处理怎么收敛更合理？"
 ```
 
 Attach files:
@@ -54,20 +63,22 @@ It collects git status, diff, and small untracked text files before calling Reas
 
 ## Modes
 
+- `consult`: pure Codex <-> Reasonix discussion, second opinion, and focused delegation without forcing review schema
 - `engineering-feedback`: DeepSeek v4 Pro second opinion on Codex's engineering plan or diff
 - `engineering-plan`: DeepSeek v4 Pro review of Codex's implementation plan and verification strategy
 - `daily-review`: DeepSeek v4 Pro daily second opinion
 - `final-review`: high-confidence final judgment
 - `adversarial-review`: focused challenge review for wrong assumptions, hidden risks, counterexamples, rollback gaps, and missing verification
-- `general`: mixed Reasonix review fallback
+- `general`: low-cost mixed Reasonix consultation fallback
 
-## Long Reviews
+## Long Tasks
 
-When a review may take a long time, use a background job so the Codex session is not blocked.
+When a consult or review task may take a long time, use a background job so the Codex session is not blocked.
 
 Start:
 
 ```bash
+crb consult --background --json "商量一下这个多 agent 协作协议怎么收敛"
 crb delegate --mode final-review --background --json "审一下这个大型变更"
 ```
 
@@ -78,7 +89,7 @@ Manage:
 - `crb result --json <job-id>`: get the full job record, including `result`, `rendered`, `raw`, and errors
 - `crb cancel <job-id>`: cancel the job
 
-Foreground mode has a default timeout of 180000ms and is best for quick review. Background mode defaults to no timeout unless `--timeout-ms` is explicitly passed. For `final-review` or any large G2/G3 review, prefer `--background`.
+Foreground mode has a default timeout of 180000ms and is best for quick consult/review. Background mode defaults to no timeout unless `--timeout-ms` is explicitly passed. For `consult`, `final-review`, or any large G2/G3 review, prefer `--background`.
 
 ## Input Boundary
 
@@ -101,7 +112,7 @@ crb review --background --json "审 blocker/high risk/missing tests"
 
 If the result says `[NEEDS_INPUT]`, attach the requested file/diff/context and rerun. Do not ask Reasonix to inspect local paths directly.
 
-`--json` results may come back with model logs or markdown fences around the JSON. The bridge extracts the structured review JSON when possible and stores raw output in background job records for debugging.
+`--json` results may come back with model logs or markdown fences around the JSON. The bridge extracts the structured JSON when possible and stores raw output in background job records for debugging.
 
 For `final-review`, `engineering-feedback`, `daily-review`, and `adversarial-review`, the structured result follows `schemas/review-output.schema.json`: `verdict`, `summary`, `findings[]`, and `next_steps[]`. If schema validation fails, the bridge must preserve and render raw model output instead of discarding it.
 
@@ -109,7 +120,7 @@ By default the bridge starts `reasonix run --no-config` under a temporary HOME a
 
 ## Discipline
 
-Reasonix output is review input, not an unconditional patch.
+Reasonix output is consultation/review input, not an unconditional patch.
 
 Codex must:
 

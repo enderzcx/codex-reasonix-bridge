@@ -4,6 +4,8 @@ import test from "node:test";
 
 test("README documents result rendering, raw fallback, schema, and adversarial review", () => {
   const readme = readFileSync("README.md", "utf8");
+  assert.match(readme, /crb consult/);
+  assert.match(readme, /单纯商量/);
   assert.match(readme, /crb result <job-id>/);
   assert.match(readme, /crb result --json <job-id>/);
   assert.match(readme, /rendered/);
@@ -14,6 +16,7 @@ test("README documents result rendering, raw fallback, schema, and adversarial r
 
 test("skill documents source-of-truth result handling", () => {
   const skill = readFileSync("skills/codex-reasonix/SKILL.md", "utf8");
+  assert.match(skill, /crb consult/);
   assert.match(skill, /crb result <job-id>/);
   assert.match(skill, /crb result --json <job-id>/);
   assert.match(skill, /raw model output/);

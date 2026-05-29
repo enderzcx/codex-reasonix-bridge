@@ -1,17 +1,19 @@
 # Runtime
 
-Use `crb` only for Reasonix / DeepSeek engineering review.
+Use `crb` for Reasonix / DeepSeek engineering consultation and review.
 
 Preferred commands:
 
 ```bash
+crb consult --json "<question>"
 crb delegate --mode <mode> --json "<task>"
 crb review --background --json "<focus>"
 ```
 
-Long review should run in the background:
+Long consult/review should run in the background:
 
 ```bash
+crb consult --background --json "<question>"
 crb delegate --mode final-review --background --json "<task>"
 crb status <job-id>
 crb result <job-id>

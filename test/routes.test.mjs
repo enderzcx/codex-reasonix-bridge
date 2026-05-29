@@ -5,11 +5,21 @@ import { buildSystemPrompt, buildUserPrompt } from "../src/prompts.mjs";
 import { parseDelegateArgs, parseReviewArgs, wrapJsonOutput } from "../src/cli.mjs";
 
 test("normalizes review modes and DeepSeek aliases", () => {
+  assert.equal(normalizeMode("ask"), "consult");
+  assert.equal(normalizeMode("chat"), "consult");
+  assert.equal(normalizeMode("rescue"), "consult");
   assert.equal(normalizeMode("review"), "final-review");
   assert.equal(normalizeMode("challenge"), "adversarial-review");
   assert.equal(normalizeMode("eng-plan"), "engineering-plan");
   assert.equal(normalizeModelId("v4-pro"), "deepseek-v4-pro:cloud");
   assert.equal(normalizeModelId("deepseek-v4-flash"), "deepseek-v4-flash:cloud");
+});
+
+test("routes pure consultation to DeepSeek v4 Pro without review schema", () => {
+  const route = resolveRoute({ mode: "consult" });
+  assert.equal(route.model, "deepseek-v4-pro:cloud");
+  assert.equal(route.outputKind, "discussion");
+  assert.equal(routeMetadata(route).output_kind, "discussion");
 });
 
 test("routes review and engineering judgment to DeepSeek v4 Pro", () => {
@@ -44,6 +54,15 @@ test("system prompt keeps bridge in reviewer role", () => {
   assert.match(prompt, /Return ONLY a valid JSON object/);
   assert.match(prompt, /"verdict": "approve\|needs-attention"/);
   assert.match(prompt, /"findings"/);
+});
+
+test("consult prompt supports discussion without forcing review schema", () => {
+  const prompt = buildSystemPrompt("consult", true);
+  assert.match(prompt, /工程咨询/);
+  assert.match(prompt, /discussion\|review\|plan\|note/);
+  assert.match(prompt, /Codex is the engineering executor/);
+  assert.match(prompt, /Use only the task/);
+  assert.doesNotMatch(prompt, /"verdict": "approve\|needs-attention"/);
 });
 
 test("user prompt includes context and attached files", () => {

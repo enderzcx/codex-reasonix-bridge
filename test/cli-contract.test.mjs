@@ -100,6 +100,36 @@ console.log(JSON.stringify({
   assert.equal(payload.parse_status, "parsed");
 });
 
+test("consult command defaults to discussion mode", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "crb-consult-contract-"));
+  const fakeReasonix = join(cwd, "reasonix");
+  writeFileSync(
+    fakeReasonix,
+    `#!/usr/bin/env node
+console.log(JSON.stringify({
+  summary: "consulted",
+  deliverables: [{ type: "discussion", title: "Answer", content: "talk it through" }],
+  notes: [],
+  next_for_codex: ["decide"]
+}));
+`,
+  );
+  chmodSync(fakeReasonix, 0o755);
+
+  const output = run(process.execPath, [
+    BIN,
+    "consult",
+    "--json",
+    "--reasonix-bin",
+    fakeReasonix,
+    "商量一下这个问题",
+  ], { cwd, encoding: "utf8" });
+  const payload = JSON.parse(output);
+  assert.equal(payload.mode, "consult");
+  assert.equal(payload.routing.output_kind, "discussion");
+  assert.equal(payload.deliverables[0].type, "discussion");
+});
+
 test("background delegate returns a job id without waiting for the model", () => {
   const cwd = mkdtempSync(join(tmpdir(), "crb-background-contract-"));
   const fakeReasonix = join(cwd, "reasonix");
