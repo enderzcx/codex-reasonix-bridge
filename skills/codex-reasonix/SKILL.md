@@ -1,6 +1,6 @@
 ---
 name: codex-reasonix
-description: Use Reasonix / DeepSeek v4 Pro from Codex for engineering consultation, second opinions, plan review, daily review, and final judgment.
+description: Use when Codex needs Reasonix / DeepSeek v4 Pro for engineering consultation, second opinions, plan review, git diff review, daily review, final judgment, or compact review of a large current repo diff. Not for copywriting, UI taste, frontend first-pass, browsing, local file inspection without attached evidence, or replacing Codex's own verification.
 ---
 
 # codex-reasonix
@@ -60,6 +60,14 @@ crb review --background --json "重点看 schema/migration/rollback 风险"
 ```
 
 It collects git status, diff, and small untracked text files before calling Reasonix, so the reviewer gets explicit evidence instead of trying to inspect local paths.
+
+For large current diffs, use compact review:
+
+```bash
+crb review --compact --background --json "只看 blocker/high 和必须补的验证"
+```
+
+`crb review` now auto-compacts when full git context exceeds the byte cap. `--compact` forces compact context immediately: diff stat, changed files, name-status, and zero-context hunks, with a clear instruction for Reasonix to request exact files or full hunks when needed.
 
 ## Modes
 

@@ -168,10 +168,11 @@ test("parses background and timeout delegate controls", () => {
 });
 
 test("parses git review controls", () => {
-  const opts = parseReviewArgs(["--background", "--scope", "working-tree", "--base", "main", "--json", "focus on migrations"]);
+  const opts = parseReviewArgs(["--background", "--scope", "working-tree", "--base", "main", "--compact", "--json", "focus on migrations"]);
   assert.equal(opts.background, true);
   assert.equal(opts.scope, "working-tree");
   assert.equal(opts.base, "main");
+  assert.equal(opts.compact, true);
   assert.equal(opts.json, true);
   assert.equal(opts.mode, "final-review");
   assert.equal(opts.task, "focus on migrations");

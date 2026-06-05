@@ -28,7 +28,14 @@ function splitLines(value) {
 function truncateUtf8(value, byteCap) {
   const bytes = Buffer.byteLength(value, "utf8");
   if (bytes <= byteCap) return { content: value, bytes, truncated: false };
-  const content = Buffer.from(value).subarray(0, byteCap).toString("utf8");
+  const marker = `\n\n[TRUNCATED: original review context was ${bytes} bytes; byte cap is ${byteCap}. Ask Codex for exact files or full diff hunks if needed.]\n`;
+  const markerFits = Buffer.byteLength(marker, "utf8") <= byteCap;
+  const fittedMarker = markerFits ? marker : Buffer.from("\n\n[TRUNCATED]\n").subarray(0, byteCap).toString("utf8");
+  const sliceCap = Math.max(0, byteCap - Buffer.byteLength(fittedMarker, "utf8"));
+  let content = `${Buffer.from(value).subarray(0, sliceCap).toString("utf8")}${fittedMarker}`;
+  while (Buffer.byteLength(content, "utf8") > byteCap) {
+    content = content.slice(0, -1);
+  }
   return { content, bytes, truncated: true };
 }
 
@@ -142,6 +149,35 @@ function collectWorkingTreeContext(repoRoot) {
   };
 }
 
+function collectCompactWorkingTreeContext(repoRoot) {
+  const state = getWorkingTreeState(repoRoot);
+  const status = git(repoRoot, ["status", "--short", "--untracked-files=all"]);
+  const stagedStat = git(repoRoot, ["diff", "--cached", "--stat", "--no-ext-diff", "--submodule=short"]);
+  const unstagedStat = git(repoRoot, ["diff", "--stat", "--no-ext-diff", "--submodule=short"]);
+  const stagedNames = git(repoRoot, ["diff", "--cached", "--name-status"]);
+  const unstagedNames = git(repoRoot, ["diff", "--name-status"]);
+  const stagedDiff = git(repoRoot, ["diff", "--cached", "--unified=0", "--no-ext-diff", "--submodule=short"]);
+  const unstagedDiff = git(repoRoot, ["diff", "--unified=0", "--no-ext-diff", "--submodule=short"]);
+  const untracked = state.untracked.map((file) => `- ${file}`).join("\n");
+  const changedFiles = uniqueSorted(state.staged, state.unstaged, state.untracked);
+  return {
+    summary: `Reviewing compact context for ${state.staged.length} staged, ${state.unstaged.length} unstaged, and ${state.untracked.length} untracked file(s).`,
+    changedFiles,
+    content: [
+      section("Compact Context Notice", "This compact review context omits unchanged diff context and untracked file bodies. Ask Codex for exact files or full diff hunks if needed."),
+      section("Git Status", status),
+      section("Changed File Names", uniqueSorted(state.staged, state.unstaged, state.untracked).join("\n")),
+      section("Staged Name Status", stagedNames),
+      section("Unstaged Name Status", unstagedNames),
+      section("Staged Diff Stat", stagedStat),
+      section("Unstaged Diff Stat", unstagedStat),
+      section("Staged Compact Diff (--unified=0)", stagedDiff),
+      section("Unstaged Compact Diff (--unified=0)", unstagedDiff),
+      section("Untracked File Names", untracked),
+    ].join("\n"),
+  };
+}
+
 function collectBranchContext(repoRoot, baseRef) {
   const mergeBase = git(repoRoot, ["merge-base", "HEAD", baseRef]).trim();
   const range = `${mergeBase}..HEAD`;
@@ -161,11 +197,44 @@ function collectBranchContext(repoRoot, baseRef) {
   };
 }
 
-export function collectReviewContext(cwd, target, { byteCap = DEFAULT_REVIEW_CONTEXT_BYTE_CAP } = {}) {
-  const repoRoot = ensureGitRepository(cwd);
-  const collected = target.mode === "branch"
-    ? collectBranchContext(repoRoot, target.baseRef)
+function collectCompactBranchContext(repoRoot, baseRef) {
+  const mergeBase = git(repoRoot, ["merge-base", "HEAD", baseRef]).trim();
+  const range = `${mergeBase}..HEAD`;
+  const currentBranch = git(repoRoot, ["branch", "--show-current"]).trim() || "HEAD";
+  const changedFiles = splitLines(git(repoRoot, ["diff", "--name-only", range]));
+  const commitLog = git(repoRoot, ["log", "--oneline", "--decorate", range]);
+  const diffStat = git(repoRoot, ["diff", "--stat", range]);
+  const nameStatus = git(repoRoot, ["diff", "--name-status", range]);
+  const diff = git(repoRoot, ["diff", "--unified=0", "--no-ext-diff", "--submodule=short", range]);
+  return {
+    summary: `Reviewing compact branch context for ${currentBranch} against ${baseRef} from merge-base ${mergeBase}.`,
+    changedFiles,
+    content: [
+      section("Compact Context Notice", "This compact review context omits unchanged diff context. Ask Codex for exact files or full diff hunks if needed."),
+      section("Commit Log", commitLog),
+      section("Changed File Names", changedFiles.join("\n")),
+      section("Name Status", nameStatus),
+      section("Diff Stat", diffStat),
+      section("Compact Branch Diff (--unified=0)", diff),
+    ].join("\n"),
+  };
+}
+
+function collectContextByStyle(repoRoot, target, style) {
+  if (target.mode === "branch") {
+    return style === "compact"
+      ? collectCompactBranchContext(repoRoot, target.baseRef)
+      : collectBranchContext(repoRoot, target.baseRef);
+  }
+  return style === "compact"
+    ? collectCompactWorkingTreeContext(repoRoot)
     : collectWorkingTreeContext(repoRoot);
+}
+
+export function collectReviewContext(cwd, target, { byteCap = DEFAULT_REVIEW_CONTEXT_BYTE_CAP, style = "auto" } = {}) {
+  const repoRoot = ensureGitRepository(cwd);
+  const requestedStyle = style === "compact" ? "compact" : "full";
+  let collected = collectContextByStyle(repoRoot, target, requestedStyle);
   const header = [
     "# crb review context",
     "",
@@ -173,9 +242,26 @@ export function collectReviewContext(cwd, target, { byteCap = DEFAULT_REVIEW_CON
     `Target: ${target.label}`,
     `Summary: ${collected.summary}`,
     `Changed files: ${collected.changedFiles.length}`,
+    `Context style: ${requestedStyle}`,
     "",
   ].join("\n");
-  const body = `${header}${collected.content}`;
+  let body = `${header}${collected.content}`;
+  let compacted = false;
+  if (style === "auto" && Buffer.byteLength(body, "utf8") > byteCap) {
+    collected = collectContextByStyle(repoRoot, target, "compact");
+    compacted = true;
+    body = [
+      "# crb review context",
+      "",
+      `Repository: ${repoRoot}`,
+      `Target: ${target.label}`,
+      `Summary: ${collected.summary}`,
+      `Changed files: ${collected.changedFiles.length}`,
+      "Context style: compact (auto; full context exceeded byte cap)",
+      "",
+      collected.content,
+    ].join("\n");
+  }
   const truncated = truncateUtf8(body, byteCap);
   return {
     repoRoot,
@@ -183,6 +269,8 @@ export function collectReviewContext(cwd, target, { byteCap = DEFAULT_REVIEW_CON
     summary: collected.summary,
     changedFiles: collected.changedFiles,
     path: `[git] ${target.label}`,
+    contextStyle: compacted ? "compact-auto" : requestedStyle,
+    compacted,
     ...truncated,
   };
 }

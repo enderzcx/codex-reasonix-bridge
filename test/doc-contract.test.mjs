@@ -8,6 +8,7 @@ test("README documents result rendering, raw fallback, schema, and adversarial r
   assert.match(readme, /单纯商量/);
   assert.match(readme, /crb result <job-id>/);
   assert.match(readme, /crb result --json <job-id>/);
+  assert.match(readme, /crb review --compact/);
   assert.match(readme, /rendered/);
   assert.match(readme, /raw/);
   assert.match(readme, /schemas\/review-output\.schema\.json/);
@@ -19,6 +20,7 @@ test("skill documents source-of-truth result handling", () => {
   assert.match(skill, /crb consult/);
   assert.match(skill, /crb result <job-id>/);
   assert.match(skill, /crb result --json <job-id>/);
+  assert.match(skill, /crb review --compact/);
   assert.match(skill, /raw model output/);
   assert.match(skill, /schema validation fails/);
   assert.match(skill, /Do not ask Reasonix to inspect local paths directly/);
@@ -32,6 +34,7 @@ test("split skill docs keep runtime, result, and prompt concerns separate", () =
   const results = readFileSync("skills/codex-reasonix/result-handling.md", "utf8");
   const prompts = readFileSync("skills/codex-reasonix/prompt-templates.md", "utf8");
   assert.match(runtime, /crb delegate/);
+  assert.match(runtime, /--compact/);
   assert.match(results, /source-of-truth/);
   assert.match(results, /raw-fallback|schema-fallback/);
   assert.match(prompts, /Adversarial review/);

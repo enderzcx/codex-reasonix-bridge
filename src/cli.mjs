@@ -110,7 +110,7 @@ async function runPreparedDelegate({ opts, task, files }) {
 export async function review(argv) {
   const opts = parseReviewArgs(argv);
   const target = resolveReviewTarget(process.cwd(), { base: opts.base, scope: opts.scope });
-  const reviewContext = collectReviewContext(process.cwd(), target);
+  const reviewContext = collectReviewContext(process.cwd(), target, { style: opts.compact ? "compact" : "auto" });
   const task = [
     opts.task || "Review the attached git context for material blockers, high-risk regressions, and missing tests.",
     "",
@@ -128,6 +128,7 @@ export async function review(argv) {
     `review target: ${target.label}`,
     `repo root: ${reviewContext.repoRoot}`,
     reviewContext.summary,
+    `review context style: ${reviewContext.contextStyle}`,
     reviewContext.truncated
       ? `review context truncated from ${reviewContext.bytes} bytes to ${Buffer.byteLength(reviewContext.content, "utf8")} bytes`
       : `review context bytes: ${reviewContext.bytes}`,
@@ -282,6 +283,7 @@ export function parseReviewArgs(argv) {
     json: false,
     dryRun: false,
     background: false,
+    compact: false,
     noProxy: false,
     isolateRuntime: true,
     model: undefined,
@@ -300,6 +302,7 @@ export function parseReviewArgs(argv) {
     else if (arg === "--json") opts.json = true;
     else if (arg === "--dry-run") opts.dryRun = true;
     else if (arg === "--background") opts.background = true;
+    else if (arg === "--compact") opts.compact = true;
     else if (arg === "--no-proxy") opts.noProxy = true;
     else if (arg === "--no-isolate-runtime") opts.isolateRuntime = false;
     else if (arg === "--model" || arg === "-m") opts.model = requireValue(argv, ++i, arg);
@@ -714,6 +717,7 @@ Options:
   --base <ref>           Review branch diff against a base ref.
   --mode <mode>          final-review | adversarial-review | daily-review | engineering-feedback. Default: final-review.
   --context <text>       Add short context; repeatable.
+  --compact              Use compact git context immediately; auto mode also compacts when full context exceeds the byte cap.
   --json                 Ask for and emit stable JSON.
   --background           Run as a tracked background job. Recommended for non-trivial reviews.
   -m, --model <id>       Override routed model.

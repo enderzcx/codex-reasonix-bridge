@@ -168,6 +168,14 @@ crb result <job-id>
 
 `crb review` 会自动判断当前工作树或 branch diff，并把 git status、diff、untracked text files 作为显式输入传给 Reasonix。这样 reviewer 不需要、也不能自己去读本地路径。
 
+大型 diff 可以直接走 compact review：
+
+```bash
+crb review --compact --background --json "只看 blocker/high 和必须补的验证"
+```
+
+默认 `crb review` 会先尝试完整 git context；如果超过输入 byte cap，会自动切换到 compact context。Compact context 包含 status、changed files、name-status、diff stat 和 `--unified=0` 的紧凑 hunks，并明确要求 Reasonix 在信息不足时返回 `[NEEDS_INPUT]`。
+
 ## 长时间任务使用后台 Job
 
 当 consult/review 任务耗时较长，例如商量复杂架构方案、审查大型 diff 或跑最终判断时，建议使用后台 job 模式，避免 Codex 会话同步阻塞。后台 job 会在独立进程中运行，你可以通过命令管理其状态和结果。
