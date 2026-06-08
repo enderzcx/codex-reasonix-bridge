@@ -8,6 +8,25 @@ import { createJob } from "../src/state.mjs";
 
 const BIN = resolve("bin/codex-reasonix-bridge.mjs");
 
+function writeFakeReasonix(path, body) {
+  writeFileSync(
+    path,
+    `#!/usr/bin/env node
+const argv = process.argv.slice(2);
+if (!argv.includes("delegate")) {
+  console.error("expected native reasonix delegate runtime, got: " + argv.join(" "));
+  process.exit(64);
+}
+if (argv.includes("run")) {
+  console.error("bridge must not call reasonix run for delegate/review");
+  process.exit(65);
+}
+${body}
+`,
+  );
+  chmodSync(path, 0o755);
+}
+
 test("result command returns rendered output, not the full job JSON", () => {
   const cwd = mkdtempSync(join(tmpdir(), "crb-result-contract-"));
   createJob(cwd, {
@@ -71,10 +90,9 @@ test("result command renders legacy jobs without a stored rendered field", () =>
 test("foreground delegate --json keeps machine-readable JSON output", () => {
   const cwd = mkdtempSync(join(tmpdir(), "crb-foreground-json-contract-"));
   const fakeReasonix = join(cwd, "reasonix");
-  writeFileSync(
+  writeFakeReasonix(
     fakeReasonix,
-    `#!/usr/bin/env node
-console.log(JSON.stringify({
+    `console.log(JSON.stringify({
   verdict: "approve",
   summary: "ok",
   findings: [],
@@ -82,7 +100,6 @@ console.log(JSON.stringify({
 }));
 `,
   );
-  chmodSync(fakeReasonix, 0o755);
 
   const output = run(process.execPath, [
     BIN,
@@ -100,13 +117,49 @@ console.log(JSON.stringify({
   assert.equal(payload.parse_status, "parsed");
 });
 
+test("foreground delegate does not leak crb --mode to Reasonix CLIs that do not support it", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "crb-mode-compat-contract-"));
+  const fakeReasonix = join(cwd, "reasonix");
+  writeFakeReasonix(
+    fakeReasonix,
+    `if (argv.includes("--mode")) {
+  console.error("unknown flag: --mode");
+  process.exit(67);
+}
+if (!argv.includes("--context") || !argv.includes("crb delegate mode: final-review")) {
+  console.error("expected crb mode compatibility context");
+  process.exit(68);
+}
+console.log(JSON.stringify({
+  verdict: "approve",
+  summary: "mode compat ok",
+  findings: [],
+  next_steps: []
+}));
+`,
+  );
+
+  const output = run(process.execPath, [
+    BIN,
+    "delegate",
+    "--mode",
+    "final-review",
+    "--json",
+    "--reasonix-bin",
+    fakeReasonix,
+    "quick review",
+  ], { cwd, encoding: "utf8" });
+  const payload = JSON.parse(output);
+  assert.equal(payload.verdict, "approve");
+  assert.equal(payload.summary, "mode compat ok");
+});
+
 test("consult command defaults to discussion mode", () => {
   const cwd = mkdtempSync(join(tmpdir(), "crb-consult-contract-"));
   const fakeReasonix = join(cwd, "reasonix");
-  writeFileSync(
+  writeFakeReasonix(
     fakeReasonix,
-    `#!/usr/bin/env node
-console.log(JSON.stringify({
+    `console.log(JSON.stringify({
   summary: "consulted",
   deliverables: [{ type: "discussion", title: "Answer", content: "talk it through" }],
   notes: [],
@@ -114,7 +167,6 @@ console.log(JSON.stringify({
 }));
 `,
   );
-  chmodSync(fakeReasonix, 0o755);
 
   const output = run(process.execPath, [
     BIN,
@@ -133,15 +185,13 @@ console.log(JSON.stringify({
 test("background delegate returns a job id without waiting for the model", () => {
   const cwd = mkdtempSync(join(tmpdir(), "crb-background-contract-"));
   const fakeReasonix = join(cwd, "reasonix");
-  writeFileSync(
+  writeFakeReasonix(
     fakeReasonix,
-    `#!/usr/bin/env node
-setTimeout(() => {
+    `setTimeout(() => {
   console.log(JSON.stringify({ summary: "late", deliverables: [], notes: [], next_for_codex: [] }));
 }, 1500);
 `,
   );
-  chmodSync(fakeReasonix, 0o755);
 
   const started = Date.now();
   const output = run(process.execPath, [
@@ -161,4 +211,40 @@ setTimeout(() => {
   assert.equal(payload.status, "queued");
   assert.match(payload.job_id, /^review-/);
   assert.ok(elapsed < 1000, `background command waited ${elapsed}ms`);
+});
+
+test("review command invokes native reasonix delegate runtime", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "crb-review-native-contract-"));
+  run("git", ["init"], { cwd, encoding: "utf8" });
+  writeFileSync(join(cwd, "change.txt"), "review me\n");
+  const fakeReasonix = join(cwd, "reasonix");
+  writeFakeReasonix(
+    fakeReasonix,
+    `if (!argv.includes("--input")) {
+  console.error("review must pass collected git context as --input");
+  process.exit(66);
+}
+console.log(JSON.stringify({
+  verdict: "approve",
+  summary: "review ok",
+  findings: [],
+  next_steps: []
+}));
+`,
+  );
+
+  const output = run(process.execPath, [
+    BIN,
+    "review",
+    "--scope",
+    "working-tree",
+    "--json",
+    "--reasonix-bin",
+    fakeReasonix,
+    "focused review",
+  ], { cwd, encoding: "utf8" });
+  const payload = JSON.parse(output);
+  assert.equal(payload.verdict, "approve");
+  assert.equal(payload.summary, "review ok");
+  assert.equal(payload.parse_status, "parsed");
 });

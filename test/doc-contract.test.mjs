@@ -24,6 +24,8 @@ test("skill documents source-of-truth result handling", () => {
   assert.match(skill, /raw model output/);
   assert.match(skill, /schema validation fails/);
   assert.match(skill, /Do not ask Reasonix to inspect local paths directly/);
+  assert.match(skill, /Go `DeepSeek-Reasonix` `main-v2`/);
+  assert.match(skill, /old TypeScript `DeepSeek-Reasonix` `main` \/ `v1`/);
   assert.match(skill, /runtime\.md/);
   assert.match(skill, /result-handling\.md/);
   assert.match(skill, /prompt-templates\.md/);
@@ -35,6 +37,8 @@ test("split skill docs keep runtime, result, and prompt concerns separate", () =
   const prompts = readFileSync("skills/codex-reasonix/prompt-templates.md", "utf8");
   assert.match(runtime, /crb delegate/);
   assert.match(runtime, /--compact/);
+  assert.match(runtime, /Go `main-v2`/);
+  assert.match(runtime, /one-shot provider call/);
   assert.match(results, /source-of-truth/);
   assert.match(results, /raw-fallback|schema-fallback/);
   assert.match(prompts, /Adversarial review/);

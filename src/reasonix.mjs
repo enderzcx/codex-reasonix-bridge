@@ -1,14 +1,39 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 const APP_NODE = "/Applications/Reasonix.app/Contents/Resources/node";
 const APP_CLI = "/Applications/Reasonix.app/Contents/Resources/dist/cli/index.js";
 export const DEFAULT_TIMEOUT_MS = 180_000;
+const delegateCapabilityCache = new Map();
 
-export async function runDelegateModel({ reasonixBin, model, effort, system, prompt, noProxy = false, timeoutMs, isolateRuntime = true }) {
-  return runReasonix({ reasonixBin, model, effort, system, prompt, noProxy, timeoutMs, isolateRuntime });
+export async function runDelegateModel({
+  reasonixBin,
+  mode,
+  model,
+  effort,
+  task,
+  contexts = [],
+  files = [],
+  json = false,
+  noProxy = false,
+  timeoutMs,
+  isolateRuntime = true,
+}) {
+  return runReasonixDelegate({
+    reasonixBin,
+    mode,
+    model,
+    effort,
+    task,
+    contexts,
+    files,
+    json,
+    noProxy,
+    timeoutMs,
+    isolateRuntime,
+  });
 }
 
 export function resolveReasonixCommand(reasonixBin = process.env.REASONIX_BIN) {
@@ -30,14 +55,33 @@ export function resolveTimeoutMs(value = process.env.CRB_TIMEOUT_MS ?? process.e
   return parsed;
 }
 
-export async function runReasonix({ reasonixBin, model, effort, system, prompt, noProxy = false, timeoutMs = resolveTimeoutMs(), isolateRuntime = true }) {
+export async function runReasonixDelegate({
+  reasonixBin,
+  mode,
+  model,
+  effort,
+  task,
+  contexts = [],
+  files = [],
+  json = false,
+  noProxy = false,
+  timeoutMs = resolveTimeoutMs(),
+  isolateRuntime = true,
+}) {
   const command = resolveReasonixCommand(reasonixBin);
-  const args = [...command.slice(1), "run", "-m", model];
+  const inputDir = files.length ? mkdtempSync(join(tmpdir(), "crb-reasonix-input-")) : null;
+  const inputPaths = inputDir ? materializeInputFiles(inputDir, files) : [];
+  const capabilities = resolveReasonixDelegateCapabilities(command);
+  const args = [...command.slice(1), "delegate"];
+  if (capabilities.modeFlag) args.push("--mode", mode);
+  args.push("-m", model);
   if (effort) args.push("--effort", effort);
-  if (system) args.push("--system", system);
+  if (json) args.push("--json");
+  const delegateContexts = capabilities.modeFlag ? contexts : [`crb delegate mode: ${mode}`, ...contexts];
+  for (const context of delegateContexts) args.push("--context", context);
+  for (const inputPath of inputPaths) args.push("--input", inputPath);
   if (noProxy) args.push("--no-proxy");
-  if (isolateRuntime) args.push("--no-config");
-  args.push(prompt);
+  if (task) args.push(task);
 
   const isolatedHome = isolateRuntime ? mkdtempSync(join(tmpdir(), "crb-reasonix-home-")) : null;
   const child = spawn(command[0], args, {
@@ -77,12 +121,15 @@ export async function runReasonix({ reasonixBin, model, effort, system, prompt, 
   if (isolatedHome) {
     rmSync(isolatedHome, { recursive: true, force: true });
   }
+  if (inputDir) {
+    rmSync(inputDir, { recursive: true, force: true });
+  }
 
   if (timedOut) {
     const partial = stderr.trim() || stdout.trim();
     const detail = partial ? ` Partial output: ${partial.slice(0, 1000)}` : "";
     throw new Error(
-      `Reasonix run timed out after ${timeoutMs}ms with model ${model}. ` +
+      `Reasonix delegate timed out after ${timeoutMs}ms with model ${model}. ` +
         "Try a smaller review input, a more targeted prompt, --model deepseek-v4-flash:cloud, or a higher --timeout-ms." +
         detail,
     );
@@ -90,9 +137,36 @@ export async function runReasonix({ reasonixBin, model, effort, system, prompt, 
 
   if (code !== 0) {
     const detail = stderr.trim() || stdout.trim() || `exit code ${code ?? "null"} signal ${signal ?? "none"}`;
-    throw new Error(`Reasonix run failed: ${detail}`);
+    throw new Error(`Reasonix delegate failed: ${detail}`);
   }
   return { stdout, stderr };
+}
+
+export function resolveReasonixDelegateCapabilities(command) {
+  const key = command.join("\0");
+  const cached = delegateCapabilityCache.get(key);
+  if (cached) return cached;
+
+  const help = spawnSync(command[0], [...command.slice(1), "delegate", "--help"], {
+    encoding: "utf8",
+    timeout: 750,
+    env: buildReasonixEnv({ isolateRuntime: false, isolatedHome: null }),
+  });
+  const text = `${help.stdout ?? ""}\n${help.stderr ?? ""}`;
+  const capabilities = {
+    modeFlag: help.status === 0 && /(^|\s)--mode(\s|,|$)/.test(text),
+  };
+  delegateCapabilityCache.set(key, capabilities);
+  return capabilities;
+}
+
+function materializeInputFiles(dir, files) {
+  return files.map((file, index) => {
+    const label = basename(file.path || `input-${index + 1}.txt`).replace(/[^A-Za-z0-9._-]/g, "_") || `input-${index + 1}.txt`;
+    const path = join(dir, `${String(index + 1).padStart(2, "0")}-${label}`);
+    writeFileSync(path, file.content ?? "", "utf8");
+    return path;
+  });
 }
 
 function buildReasonixEnv({ isolateRuntime, isolatedHome }) {

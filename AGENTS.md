@@ -11,7 +11,7 @@ DeepSeek consultation/review workflow outside core.
 ## Working Rules
 
 - Keep the bridge external. Do not vendor or fork Reasonix core.
-- Prefer stable `reasonix run` as the execution boundary.
+- Prefer stable native `reasonix delegate` as the execution boundary for all bridge review/delegation calls.
 - Reasonix-side models may produce engineering consultation, reviews, risk notes, plans, and final judgment.
 - Codex remains the only engineering executor and final code reviewer.
 - Add modes only when they map to a real Codex workflow.
@@ -32,7 +32,7 @@ DeepSeek consultation/review workflow outside core.
 - `--json` output may contain Reasonix logs or fenced JSON. The bridge must extract structured JSON robustly while preserving raw output in background job records.
 - Background jobs must store `result`, `rendered`, and `raw`; `crb result <job-id>` returns `rendered`, while `crb result --json <job-id>` returns the full job record.
 - Review modes `engineering-feedback`, `daily-review`, `final-review`, and `adversarial-review` must validate against `schemas/review-output.schema.json`; schema failures must render raw output rather than drop it.
-- Default Reasonix calls must isolate runtime with temporary HOME + `reasonix run --no-config`; only pass `--no-isolate-runtime` for explicit debugging.
+- Default Reasonix calls must isolate runtime with temporary HOME + native `reasonix delegate`; review/delegation must not call `reasonix run`. Only pass `--no-isolate-runtime` for explicit debugging.
 
 ## Verification
 

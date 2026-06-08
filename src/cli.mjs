@@ -4,7 +4,6 @@ import { resolve } from "node:path";
 import { stat } from "node:fs/promises";
 import { stdin, stdout } from "node:process";
 import { collectReviewContext, resolveReviewTarget } from "./git-context.mjs";
-import { buildSystemPrompt, buildUserPrompt } from "./prompts.mjs";
 import { renderDelegateResult } from "./render.mjs";
 import { runDelegateModel } from "./reasonix.mjs";
 import { isStructuredReviewMode, validateReviewOutput } from "./review-schema.mjs";
@@ -145,14 +144,14 @@ export async function review(argv) {
 }
 
 async function runDelegateRequest({ opts, task, mode, route, metadata, files }) {
-  const system = buildSystemPrompt(mode, opts.json);
-  const prompt = buildUserPrompt({ task, contexts: opts.contexts, files });
   const result = await runDelegateModel({
     reasonixBin: opts.reasonixBin,
+    mode,
     model: route.model,
     effort: opts.effort,
-    system,
-    prompt,
+    task,
+    contexts: opts.contexts,
+    files,
     json: opts.json,
     noProxy: opts.noProxy,
     timeoutMs: opts.timeoutMs,
@@ -504,6 +503,14 @@ export function wrapJsonOutput(raw, mode, routing) {
   if (extracted?.parsed) {
     const parsed = extracted.parsed;
     const notes = Array.isArray(parsed.notes) ? [...parsed.notes] : [];
+    if (typeof parsed.parse_status === "string") {
+      return {
+        ...parsed,
+        mode: parsed.mode ?? mode,
+        routing: parsed.routing ?? routing,
+        ...(notes.length ? { notes } : {}),
+      };
+    }
     if (extracted.source !== "direct") {
       notes.push("Bridge extracted structured JSON from mixed Reasonix output.");
     }

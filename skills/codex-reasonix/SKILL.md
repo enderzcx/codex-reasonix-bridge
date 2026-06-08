@@ -24,6 +24,13 @@ Companion docs in this skill:
 
 ## Command
 
+Runtime source of truth:
+
+- Prefer the official Go `DeepSeek-Reasonix` `main-v2` native `reasonix delegate` runtime.
+- Treat the old TypeScript `DeepSeek-Reasonix` `main` / `v1` delegate overlay as legacy/local compatibility only.
+- `crb delegate`, `crb consult`, and `crb review` should wrap `reasonix delegate`; they must not depend on `reasonix run` for review/delegation.
+- `reasonix delegate` is a one-shot provider call: it does not enter the full Reasonix agent loop, does not edit files, and only sees task text, `--context`, and `--input` material attached by Codex.
+
 Prefer:
 
 ```bash
@@ -120,11 +127,11 @@ crb review --background --json "审 blocker/high risk/missing tests"
 
 If the result says `[NEEDS_INPUT]`, attach the requested file/diff/context and rerun. Do not ask Reasonix to inspect local paths directly.
 
-`--json` results may come back with model logs or markdown fences around the JSON. The bridge extracts the structured JSON when possible and stores raw output in background job records for debugging.
+`--json` results come from native `reasonix delegate`. The native runtime normalizes direct JSON, fenced JSON, mixed output, and raw fallback; the bridge preserves that normalized payload in background job records for debugging.
 
 For `final-review`, `engineering-feedback`, `daily-review`, and `adversarial-review`, the structured result follows `schemas/review-output.schema.json`: `verdict`, `summary`, `findings[]`, and `next_steps[]`. If schema validation fails, the bridge must preserve and render raw model output instead of discarding it.
 
-By default the bridge starts `reasonix run --no-config` under a temporary HOME and only carries necessary API key / base URL env through. This keeps user MCP, nowledge-mem, and global Reasonix tools out of the reviewer runtime. Use `--no-isolate-runtime` only when explicitly debugging the full Reasonix environment.
+By default the bridge starts native `reasonix delegate` under a temporary HOME and only carries necessary API key / base URL env through. Review/delegation does not call `reasonix run` or enter the full Reasonix agent loop. Use `--no-isolate-runtime` only when explicitly debugging the full Reasonix environment. When debugging the runtime implementation itself, use the clean Go main-v2 worktree rather than the dirty legacy TypeScript worktree.
 
 ## Discipline
 

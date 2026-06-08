@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeMode, normalizeModelId, resolveRoute, routeMetadata } from "../src/routes.mjs";
-import { buildSystemPrompt, buildUserPrompt } from "../src/prompts.mjs";
 import { parseDelegateArgs, parseReviewArgs, wrapJsonOutput } from "../src/cli.mjs";
 
 test("normalizes review modes and DeepSeek aliases", () => {
@@ -42,40 +41,6 @@ test("falls back to available review models when provided", () => {
   });
   assert.equal(route.model, "deepseek-v4-flash:cloud");
   assert.equal(route.selection, "fallback");
-});
-
-test("system prompt keeps bridge in reviewer role", () => {
-  const prompt = buildSystemPrompt("final-review", true);
-  assert.match(prompt, /Codex is the engineering executor/);
-  assert.match(prompt, /do not have access to Codex's local filesystem/);
-  assert.match(prompt, /nowledge-mem/);
-  assert.match(prompt, /Do not produce unconditional patches/);
-  assert.match(prompt, /codex-mimo-skill/);
-  assert.match(prompt, /Return ONLY a valid JSON object/);
-  assert.match(prompt, /"verdict": "approve\|needs-attention"/);
-  assert.match(prompt, /"findings"/);
-});
-
-test("consult prompt supports discussion without forcing review schema", () => {
-  const prompt = buildSystemPrompt("consult", true);
-  assert.match(prompt, /工程咨询/);
-  assert.match(prompt, /discussion\|review\|plan\|note/);
-  assert.match(prompt, /Codex is the engineering executor/);
-  assert.match(prompt, /Use only the task/);
-  assert.doesNotMatch(prompt, /"verdict": "approve\|needs-attention"/);
-});
-
-test("user prompt includes context and attached files", () => {
-  const prompt = buildUserPrompt({
-    task: "review landing implementation",
-    contexts: ["audience: Chinese builders"],
-    files: [{ path: "/tmp/a.diff", content: "diff", truncated: false }],
-  });
-  assert.match(prompt, /review landing implementation/);
-  assert.match(prompt, /Chinese builders/);
-  assert.match(prompt, /--- \/tmp\/a.diff ---/);
-  assert.match(prompt, /cannot access local files/);
-  assert.match(prompt, /\[NEEDS_INPUT\]/);
 });
 
 test("wraps non-json output in stable JSON", () => {

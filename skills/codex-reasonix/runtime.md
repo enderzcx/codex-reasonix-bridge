@@ -2,6 +2,14 @@
 
 Use `crb` for Reasonix / DeepSeek engineering consultation and review.
 
+Runtime boundary: `crb delegate`, `crb consult`, and `crb review` call native `reasonix delegate`. Review/delegation must not depend on `reasonix run`.
+
+Runtime source of truth:
+
+- Official Reasonix current line is Go `main-v2`; implement/debug native delegate there.
+- The old TypeScript `main` / `v1` runtime is legacy and should not be the target for new bridge work.
+- `reasonix delegate` is a one-shot provider call, not the full tool-using agent loop.
+
 Preferred commands:
 
 ```bash

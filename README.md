@@ -18,7 +18,8 @@ Codex plans/builds -> crb calls Reasonix -> DeepSeek v4 Pro responds -> Codex de
 - `crb status` / `crb result` / `crb cancel`：管理后台任务，避免长 review 阻塞 Codex 主流程
 - `rendered` / `raw` / `result`：同时保留人类可读输出、原始模型输出和结构化 payload
 - JSON / fenced JSON / mixed output extraction：避免模型真实返回了内容，却被 bridge 误判成 “non-JSON”
-- Runtime isolation：Reasonix reviewer 只看你显式传入的 task、context、diff 和文件，不偷偷读 Codex 本地 workspace
+- Native delegate runtime：bridge 通过 `reasonix delegate` 调用 Reasonix；review/delegation 不再依赖 `reasonix run`
+- Input isolation：Reasonix reviewer 只看你显式传入的 task、context、diff 和文件，不偷偷读 Codex 本地 workspace
 
 ## Requirements: 先安装 Reasonix
 
@@ -40,7 +41,7 @@ Reasonix CLI not found. Install Reasonix.app or set REASONIX_BIN.
 
 ```bash
 reasonix --help
-reasonix run -m deepseek-v4-pro:cloud "reply reasonix-ok"
+reasonix delegate --mode final-review --dry-run --json "reply reasonix-ok"
 ```
 
 如果 `reasonix` 不在 PATH 中，但你知道 CLI 路径，可以用 `REASONIX_BIN` 指定：
@@ -66,7 +67,7 @@ MiMo 的相关能力（文案、中文表达、UI/UX 设计、前端反馈等）
 
 ## 30 秒快速开始
 
-先安装并配置 Reasonix。确认 `reasonix run -m deepseek-v4-pro:cloud ...` 能正常返回后，再安装 bridge：
+先安装并配置 Reasonix。确认 `reasonix delegate --mode final-review --dry-run --json ...` 能正常返回后，再安装 bridge：
 
 ```bash
 git clone https://github.com/enderzcx/codex-reasonix-bridge.git
@@ -257,7 +258,7 @@ crb delegate --mode final-review --background --json \
 
 如果 reviewer 说 `[NEEDS_INPUT]`，说明应该补传具体文件或更小的 targeted diff，而不是让模型去读本地路径、nowledge-mem 或隐藏 runtime。
 
-默认情况下，bridge 会用隔离的临时 HOME 启动 `reasonix run --no-config`，只继承必要 API key / base URL，不继承用户的 MCP、nowledge-mem 或全局 Reasonix 工具配置。这和 `codex-plugin-cc` 的受控 review runtime 是同一思路。确实需要完整 Reasonix runtime 时才使用 `--no-isolate-runtime`。
+默认情况下，bridge 会用隔离的临时 HOME 启动 `reasonix delegate`，并从 Reasonix 本地配置中只提取必要 API key / base URL 到环境变量。`reasonix delegate` 本身是稳定的 Codex handoff runtime，不会进入 `reasonix run` 的 agent loop，也不会让 reviewer 读取 Codex workspace、nowledge-mem 或隐藏 runtime。确实需要完整 Reasonix HOME / 环境时才使用 `--no-isolate-runtime`。
 
 ## 安装与配置
 
