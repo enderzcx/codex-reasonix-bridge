@@ -99,6 +99,47 @@ console.log(JSON.stringify({ argv }));
   assert.ok(payload.argv.includes("final-review"));
 });
 
+test("runReasonixDelegate pins the overlay CLI while HOME is isolated", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "crb-overlay-env-"));
+  const fakeReasonix = join(dir, "reasonix");
+  const fakeOverlay = join(dir, "overlay-index.js");
+  writeFileSync(fakeOverlay, "");
+  writeFileSync(
+    fakeReasonix,
+    `#!/usr/bin/env node
+const argv = process.argv.slice(2);
+if (argv.includes("--help")) {
+  console.log("Usage: reasonix delegate [options]\\n  --mode <mode>");
+  process.exit(0);
+}
+console.log(JSON.stringify({
+  argv,
+  home: process.env.HOME,
+  bridgeCli: process.env.REASONIX_CODEX_BRIDGE_CLI
+}));
+`,
+  );
+  chmodSync(fakeReasonix, 0o755);
+
+  const originalBridgeCli = process.env.REASONIX_CODEX_BRIDGE_CLI;
+  process.env.REASONIX_CODEX_BRIDGE_CLI = fakeOverlay;
+  try {
+    const result = await runReasonixDelegate({
+      reasonixBin: fakeReasonix,
+      mode: "final-review",
+      model: "deepseek-v4-pro:cloud",
+      task: "ping",
+      timeoutMs: 5000,
+    });
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.bridgeCli, fakeOverlay);
+    assert.match(payload.home, /crb-reasonix-home-/);
+  } finally {
+    if (originalBridgeCli === undefined) delete process.env.REASONIX_CODEX_BRIDGE_CLI;
+    else process.env.REASONIX_CODEX_BRIDGE_CLI = originalBridgeCli;
+  }
+});
+
 test("runReasonixDelegate can opt out of isolated HOME", async () => {
   const dir = mkdtempSync(join(tmpdir(), "crb-no-isolate-"));
   const fakeReasonix = join(dir, "reasonix");

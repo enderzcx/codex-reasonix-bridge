@@ -171,11 +171,18 @@ function materializeInputFiles(dir, files) {
 
 function buildReasonixEnv({ isolateRuntime, isolatedHome }) {
   if (!isolateRuntime) return process.env;
+  const bridgeCli = process.env.REASONIX_CODEX_BRIDGE_CLI || resolveReasonixBridgeCli();
   return {
     ...process.env,
     ...readReasonixCredentialEnv(),
+    ...(bridgeCli ? { REASONIX_CODEX_BRIDGE_CLI: bridgeCli } : {}),
     ...(isolatedHome ? { HOME: isolatedHome, USERPROFILE: isolatedHome } : {}),
   };
+}
+
+function resolveReasonixBridgeCli() {
+  const overlayCli = join(homedir(), ".local", "share", "reasonix-codex-bridge", "dist", "cli", "index.js");
+  return existsSync(overlayCli) ? overlayCli : "";
 }
 
 function readReasonixCredentialEnv() {
