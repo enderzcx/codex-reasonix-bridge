@@ -6,7 +6,7 @@ import { stdin, stdout } from "node:process";
 import { collectReviewContext, resolveReviewTarget } from "./git-context.mjs";
 import { renderDelegateResult } from "./render.mjs";
 import { runDelegateModel } from "./reasonix.mjs";
-import { isStructuredReviewMode, validateReviewOutput } from "./review-schema.mjs";
+import { isStructuredReviewMode, normalizeReviewOutput } from "./review-schema.mjs";
 import { DELEGATE_MODES, MODEL_CATALOG, normalizeMode, resolveRoute, routeMetadata } from "./routes.mjs";
 import {
   appendLog,
@@ -515,7 +515,7 @@ export function wrapJsonOutput(raw, mode, routing) {
       notes.push("Bridge extracted structured JSON from mixed Reasonix output.");
     }
     if (isStructuredReviewMode(mode)) {
-      const validation = validateReviewOutput(parsed);
+      const validation = normalizeReviewOutput(parsed);
       if (!validation.ok) {
         return {
           mode,
@@ -532,11 +532,17 @@ export function wrapJsonOutput(raw, mode, routing) {
           next_for_codex: [],
         };
       }
+      const parseStatus = validation.normalized
+        ? "normalized"
+        : extracted.source === "direct" ? "parsed" : "extracted";
+      if (validation.normalized) {
+        notes.push("Bridge normalized legacy Reasonix review JSON (deliverables/next_for_codex) into review schema.");
+      }
       return {
         ...validation.value,
         mode: parsed.mode ?? mode,
         routing,
-        parse_status: extracted.source === "direct" ? "parsed" : "extracted",
+        parse_status: parseStatus,
         parse_source: extracted.source,
         ...(notes.length ? { notes } : {}),
       };

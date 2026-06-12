@@ -241,7 +241,7 @@ Bridge 的 `--json` 会要求 Reasonix / DeepSeek 返回结构化 JSON。实际�
 }
 ```
 
-如果模型返回 fenced/mixed JSON，bridge 会抽取并校验；如果校验失败或不是 JSON，`parse_status` 会变成 `schema-fallback` 或 `raw-fallback`，`rendered` 会显示原始输出，避免其他 Codex session 把一次真实 review 误判成“模型没返回”。
+如果模型返回 fenced/mixed JSON，bridge 会抽取并校验。对于已知的 legacy Reasonix review shape（`deliverables` + `next_for_codex`），bridge 会先归一化成 `findings` + `next_steps`，并把 `parse_status` 标为 `normalized`；如果归一化后仍校验失败或不是 JSON，`parse_status` 会变成 `schema-fallback` 或 `raw-fallback`，`rendered` 会显示原始输出，避免其他 Codex session 把一次真实 review 误判成“模型没返回”。
 
 **重要边界：Reasonix reviewer 不能读取 Codex 本地 workspace。**
 

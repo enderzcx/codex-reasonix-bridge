@@ -107,6 +107,46 @@ test("extracts best balanced JSON object from noisy logs", () => {
   assert.deepEqual(wrapped.next_steps, []);
 });
 
+test("normalizes legacy review JSON before schema fallback", () => {
+  const route = resolveRoute({ mode: "final-review" });
+  const wrapped = wrapJsonOutput(
+    JSON.stringify({
+      mode: "final-review",
+      routing: { selected_model: "deepseek-v4-pro:cloud" },
+      summary: "legacy shape from Reasonix",
+      deliverables: [{
+        type: "review",
+        title: "Missing regression test",
+        content: "The bridge has a test gap around legacy review JSON.",
+      }],
+      notes: [],
+      next_for_codex: ["add coverage for deliverables + next_for_codex"],
+    }),
+    "final-review",
+    routeMetadata(route),
+  );
+
+  assert.equal(wrapped.parse_status, "normalized");
+  assert.equal(wrapped.verdict, "needs-attention");
+  assert.equal(wrapped.findings[0].title, "Missing regression test");
+  assert.deepEqual(wrapped.next_steps, ["add coverage for deliverables + next_for_codex"]);
+  assert.match(wrapped.notes.join("\n"), /normalized legacy Reasonix review JSON/);
+});
+
+test("preserves raw output when malformed legacy review JSON cannot normalize", () => {
+  const route = resolveRoute({ mode: "final-review" });
+  const raw = JSON.stringify({
+    summary: "malformed legacy review",
+    deliverables: [null],
+    next_for_codex: [],
+  });
+  const wrapped = wrapJsonOutput(raw, "final-review", routeMetadata(route));
+
+  assert.equal(wrapped.parse_status, "schema-fallback");
+  assert.match(wrapped.summary, /did not match the review schema/);
+  assert.match(wrapped.deliverables[0].content, /malformed legacy review/);
+});
+
 test("preserves raw output when structured review JSON fails schema validation", () => {
   const route = resolveRoute({ mode: "final-review" });
   const wrapped = wrapJsonOutput(

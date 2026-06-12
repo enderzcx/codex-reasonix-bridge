@@ -31,7 +31,7 @@ DeepSeek consultation/review workflow outside core.
 - If a reviewer needs missing material, it must say `[NEEDS_INPUT]`; do not design prompts that tell Reasonix to inspect local paths directly.
 - `--json` output may contain Reasonix logs or fenced JSON. The bridge must extract structured JSON robustly while preserving raw output in background job records.
 - Background jobs must store `result`, `rendered`, and `raw`; `crb result <job-id>` returns `rendered`, while `crb result --json <job-id>` returns the full job record.
-- Review modes `engineering-feedback`, `daily-review`, `final-review`, and `adversarial-review` must validate against `schemas/review-output.schema.json`; schema failures must render raw output rather than drop it.
+- Review modes `engineering-feedback`, `daily-review`, `final-review`, and `adversarial-review` must validate against `schemas/review-output.schema.json`; known legacy `deliverables` / `next_for_codex` review payloads may be normalized first, and remaining schema failures must render raw output rather than drop it.
 - Default Reasonix calls must isolate runtime with temporary HOME + native `reasonix delegate`; review/delegation must not call `reasonix run`. Only pass `--no-isolate-runtime` for explicit debugging.
 
 ## Verification

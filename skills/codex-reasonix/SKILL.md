@@ -129,7 +129,7 @@ If the result says `[NEEDS_INPUT]`, attach the requested file/diff/context and r
 
 `--json` results come from native `reasonix delegate`. The native runtime normalizes direct JSON, fenced JSON, mixed output, and raw fallback; the bridge preserves that normalized payload in background job records for debugging.
 
-For `final-review`, `engineering-feedback`, `daily-review`, and `adversarial-review`, the structured result follows `schemas/review-output.schema.json`: `verdict`, `summary`, `findings[]`, and `next_steps[]`. If schema validation fails, the bridge must preserve and render raw model output instead of discarding it.
+For `final-review`, `engineering-feedback`, `daily-review`, and `adversarial-review`, the structured result follows `schemas/review-output.schema.json`: `verdict`, `summary`, `findings[]`, and `next_steps[]`. If Reasonix returns the known legacy review shape with `deliverables` / `next_for_codex`, the bridge may normalize it before rendering. If schema validation fails after normalization, the bridge must preserve and render raw model output instead of discarding it.
 
 By default the bridge starts native `reasonix delegate` under a temporary HOME and only carries necessary API key / base URL env through. Review/delegation does not call `reasonix run` or enter the full Reasonix agent loop. Use `--no-isolate-runtime` only when explicitly debugging the full Reasonix environment. When debugging the runtime implementation itself, use the clean Go main-v2 worktree rather than the dirty legacy TypeScript worktree.
 

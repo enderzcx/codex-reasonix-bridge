@@ -117,6 +117,43 @@ test("foreground delegate --json keeps machine-readable JSON output", () => {
   assert.equal(payload.parse_status, "parsed");
 });
 
+test("foreground review delegate normalizes legacy JSON", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "crb-legacy-review-json-contract-"));
+  const fakeReasonix = join(cwd, "reasonix");
+  writeFakeReasonix(
+    fakeReasonix,
+    `console.log(JSON.stringify({
+  mode: "final-review",
+  routing: { selected_model: "deepseek-v4-pro:cloud" },
+  summary: "legacy review payload",
+  deliverables: [{
+    type: "review",
+    title: "Missing regression test",
+    content: "The bridge has a missing test for alternate review shapes."
+  }],
+  notes: [],
+  next_for_codex: ["add the compatibility test"]
+}));
+`,
+  );
+
+  const output = run(process.execPath, [
+    BIN,
+    "delegate",
+    "--mode",
+    "final-review",
+    "--json",
+    "--reasonix-bin",
+    fakeReasonix,
+    "quick review",
+  ], { cwd, encoding: "utf8" });
+  const payload = JSON.parse(output);
+  assert.equal(payload.parse_status, "normalized");
+  assert.equal(payload.verdict, "needs-attention");
+  assert.equal(payload.findings[0].title, "Missing regression test");
+  assert.deepEqual(payload.next_steps, ["add the compatibility test"]);
+});
+
 test("foreground delegate does not leak crb --mode to Reasonix CLIs that do not support it", () => {
   const cwd = mkdtempSync(join(tmpdir(), "crb-mode-compat-contract-"));
   const fakeReasonix = join(cwd, "reasonix");
