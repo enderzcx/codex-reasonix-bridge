@@ -1,0 +1,29 @@
+{
+  "name": "codex-reasonix-bridge",
+  "description": "Grok marketplace for the Codex Reasonix bridge: DeepSeek Flash formal review via Reasonix MCP tools.",
+  "owner": {
+    "name": "Ender",
+    "url": "https://github.com/enderzcx"
+  },
+  "plugins": [
+    {
+      "name": "codex-reasonix",
+      "description": "Reasonix / DeepSeek V4 Flash formal (deepseek-v4-flash:0731-cloud) consult, git review, adversarial review, and job tools for Grok and Codex hosts.",
+      "category": "development",
+      "version": "0.2.1",
+      "source": {
+        "type": "local",
+        "path": "./plugins/codex-reasonix"
+      },
+      "homepage": "https://github.com/enderzcx/codex-reasonix-bridge",
+      "keywords": [
+        "reasonix",
+        "deepseek",
+        "flash",
+        "review",
+        "mcp",
+        "codex"
+      ]
+    }
+  ]
+}

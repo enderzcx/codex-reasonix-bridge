@@ -1,0 +1,21 @@
+{
+  "name": "codex-reasonix",
+  "version": "0.2.1",
+  "description": "Use Reasonix / DeepSeek V4 Flash formal (deepseek-v4-flash:0731-cloud) from Grok or Codex for engineering consult, git review, adversarial review, and bounded delegation. Host keeps final judgment.",
+  "author": {
+    "name": "Ender",
+    "url": "https://github.com/enderzcx"
+  },
+  "homepage": "https://github.com/enderzcx/codex-reasonix-bridge",
+  "repository": "https://github.com/enderzcx/codex-reasonix-bridge",
+  "license": "MIT",
+  "keywords": [
+    "grok",
+    "codex",
+    "reasonix",
+    "deepseek",
+    "flash",
+    "review",
+    "mcp"
+  ]
+}

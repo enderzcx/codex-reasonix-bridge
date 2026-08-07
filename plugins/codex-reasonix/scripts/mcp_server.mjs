@@ -11,7 +11,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "codex-reasonix";
-const SERVER_VERSION = "0.2.0";
+const SERVER_VERSION = "0.2.1";
 const PROTOCOL_VERSION = "2025-03-26";
 const SUPPORTED_PROTOCOL_VERSIONS = new Set(["2024-11-05", "2025-03-26", "2025-06-18"]);
 
@@ -188,12 +188,24 @@ function resolveCrb() {
   if (existsSync(BUNDLED_CRB)) {
     return { command: process.execPath, argsPrefix: [BUNDLED_CRB], label: BUNDLED_CRB };
   }
-  const which = spawnSync("which", ["crb"], { encoding: "utf8" });
-  if (which.status === 0 && which.stdout.trim()) {
-    return { command: which.stdout.trim(), argsPrefix: [], label: which.stdout.trim() };
+  for (const name of ["crb", "codex-reasonix-bridge"]) {
+    const which = spawnSync("which", [name], { encoding: "utf8" });
+    if (which.status === 0 && which.stdout.trim()) {
+      return { command: which.stdout.trim(), argsPrefix: [], label: which.stdout.trim() };
+    }
+  }
+  // Common user-local npm link locations when the plugin is cached without the monorepo root.
+  for (const candidate of [
+    join(homedir(), ".local", "bin", "crb"),
+    "/opt/homebrew/bin/crb",
+    "/usr/local/bin/crb",
+  ]) {
+    if (existsSync(candidate)) {
+      return { command: candidate, argsPrefix: [], label: candidate };
+    }
   }
   throw new Error(
-    `crb bridge not found. Expected ${BUNDLED_CRB} or CRB_BIN / PATH crb.`,
+    `crb bridge not found. Install the package (npm link / npm i -g) so 'crb' is on PATH, or set CRB_BIN. Bundled path tried: ${BUNDLED_CRB}`,
   );
 }
 

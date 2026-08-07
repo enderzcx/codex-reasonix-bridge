@@ -48,11 +48,20 @@ for (const rel of [
   "scripts/mcp_server.mjs",
   "skills/codex-reasonix/SKILL.md",
   ".codex-plugin/plugin.json",
+  ".grok-plugin/plugin.json",
   "plugin.json",
   "mcp.json",
   ".mcp.json",
 ]) {
   if (!existsSync(join(plugin, rel))) fail(`missing ${rel}`);
+}
+
+const grokMarket = join(root, ".grok-plugin", "marketplace.json");
+if (!existsSync(grokMarket)) fail("missing .grok-plugin/marketplace.json");
+const grokMarketJson = loadJson(grokMarket);
+if (grokMarketJson.name !== "codex-reasonix-bridge") fail("Grok marketplace name mismatch");
+if (!grokMarketJson.plugins?.some((p) => p.name === "codex-reasonix")) {
+  fail("Grok marketplace missing codex-reasonix entry");
 }
 
 const smoke = spawnSync(

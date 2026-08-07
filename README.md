@@ -70,7 +70,7 @@ MiMo 的相关能力（文案、中文表达、UI/UX 设计、前端反馈等）
 
 ## 30 秒快速开始
 
-### A. 安装为 Codex plugin（推荐）
+### A. 安装为 Codex / Grok plugin（推荐）
 
 先安装并配置 Reasonix + `OLLAMA_API_KEY`，并确保本机有：
 
@@ -85,13 +85,32 @@ git clone https://github.com/enderzcx/codex-reasonix-bridge.git
 cd codex-reasonix-bridge
 npm test
 npm run check:plugin
-npm link   # 提供 crb CLI
+npm link   # 提供 crb CLI（MCP 依赖 PATH 上的 crb）
+```
 
+**Codex：**
+
+```bash
 codex plugin marketplace add "$PWD"
 codex plugin add codex-reasonix@codex-reasonix-bridge
 ```
 
-新开一个 Codex task。应能看到 `reasonix_*` MCP tools 与 `$codex-reasonix` skill。
+**Grok（标准 marketplace）：**
+
+```bash
+grok plugin marketplace add "$PWD"
+grok plugin install codex-reasonix --trust
+# 或直接：
+# grok plugin install "$PWD/plugins/codex-reasonix" --trust
+```
+
+索引文件：
+
+- Codex：`.agents/plugins/marketplace.json`
+- Grok：`.grok-plugin/marketplace.json`
+- Portable：`plugins/codex-reasonix/plugin.json` + `mcp.json`（Agent Plugins）
+
+新开一个 Codex / Grok session。应能看到 `reasonix_*` MCP tools 与 skill。
 
 ### B. 仅 CLI
 

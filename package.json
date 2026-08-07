@@ -1,6 +1,6 @@
 {
   "name": "codex-reasonix-bridge",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Codex plugin + CLI bridge to Reasonix / DeepSeek V4 Flash formal for engineering review, second opinions, and focused delegation.",
   "type": "module",
   "bin": {
@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node --test",
     "check:plugin": "node ./scripts/check_plugin.mjs",
-    "smoke": "node ./bin/codex-reasonix-bridge.mjs delegate --mode final-review --dry-run --json \"审一下这个方案\"",
+    "smoke": "node ./bin/codex-reasonix-bridge.mjs delegate --mode final-review --dry-run --json \"\u5ba1\u4e00\u4e0b\u8fd9\u4e2a\u65b9\u6848\"",
     "install:skill": "node ./scripts/install-skill.mjs"
   },
   "keywords": [
