@@ -10,23 +10,27 @@ test("normalizes review modes and DeepSeek aliases", () => {
   assert.equal(normalizeMode("review"), "final-review");
   assert.equal(normalizeMode("challenge"), "adversarial-review");
   assert.equal(normalizeMode("eng-plan"), "engineering-plan");
-  assert.equal(normalizeModelId("v4-pro"), "deepseek-v4-pro:cloud");
-  assert.equal(normalizeModelId("deepseek-v4-flash"), "deepseek-v4-flash:cloud");
+  assert.equal(normalizeModelId("v4-pro"), "ollama-cloud/deepseek-v4-pro");
+  assert.equal(normalizeModelId("deepseek-v4-pro:cloud"), "ollama-cloud/deepseek-v4-pro");
+  assert.equal(normalizeModelId("deepseek-v4-flash"), "ollama-cloud/deepseek-v4-flash:0731-cloud");
+  assert.equal(normalizeModelId("deepseek-v4-flash:0731-cloud"), "ollama-cloud/deepseek-v4-flash:0731-cloud");
+  assert.equal(normalizeModelId("v4-pro"), "ollama-cloud/deepseek-v4-pro");
 });
 
-test("routes pure consultation to DeepSeek v4 Pro without review schema", () => {
+test("routes pure consultation to Flash formal (0731) without review schema", () => {
   const route = resolveRoute({ mode: "consult" });
-  assert.equal(route.model, "deepseek-v4-pro:cloud");
+  assert.equal(route.model, "ollama-cloud/deepseek-v4-flash:0731-cloud");
   assert.equal(route.outputKind, "discussion");
   assert.equal(routeMetadata(route).output_kind, "discussion");
 });
 
-test("routes review and engineering judgment to DeepSeek v4 Pro", () => {
-  assert.equal(resolveRoute({ mode: "engineering-feedback" }).model, "deepseek-v4-pro:cloud");
-  assert.equal(resolveRoute({ mode: "engineering-plan" }).model, "deepseek-v4-pro:cloud");
-  assert.equal(resolveRoute({ mode: "daily-review" }).model, "deepseek-v4-pro:cloud");
-  assert.equal(resolveRoute({ mode: "final-review" }).model, "deepseek-v4-pro:cloud");
-  assert.equal(resolveRoute({ mode: "adversarial-review" }).model, "deepseek-v4-pro:cloud");
+test("routes review and engineering judgment to Flash formal (0731)", () => {
+  assert.equal(resolveRoute({ mode: "engineering-feedback" }).model, "ollama-cloud/deepseek-v4-flash:0731-cloud");
+  assert.equal(resolveRoute({ mode: "engineering-plan" }).model, "ollama-cloud/deepseek-v4-flash:0731-cloud");
+  assert.equal(resolveRoute({ mode: "daily-review" }).model, "ollama-cloud/deepseek-v4-flash:0731-cloud");
+  assert.equal(resolveRoute({ mode: "final-review" }).model, "ollama-cloud/deepseek-v4-flash:0731-cloud");
+  assert.equal(resolveRoute({ mode: "adversarial-review" }).model, "ollama-cloud/deepseek-v4-flash:0731-cloud");
+  assert.equal(resolveRoute({ mode: "general" }).model, "ollama-cloud/deepseek-v4-flash:0731-cloud");
 });
 
 test("rejects MiMo-owned modes after split", () => {
@@ -34,12 +38,12 @@ test("rejects MiMo-owned modes after split", () => {
   assert.throws(() => normalizeMode("frontend-first-pass"), /unsupported delegate mode/);
 });
 
-test("falls back to available review models when provided", () => {
+test("falls back to Pro preview when formal Flash is unavailable", () => {
   const route = resolveRoute({
     mode: "final-review",
-    availableModels: ["deepseek-v4-flash:cloud"],
+    availableModels: ["deepseek-v4-pro:cloud"],
   });
-  assert.equal(route.model, "deepseek-v4-flash:cloud");
+  assert.equal(route.model, "ollama-cloud/deepseek-v4-pro");
   assert.equal(route.selection, "fallback");
 });
 
@@ -112,7 +116,7 @@ test("normalizes legacy review JSON before schema fallback", () => {
   const wrapped = wrapJsonOutput(
     JSON.stringify({
       mode: "final-review",
-      routing: { selected_model: "deepseek-v4-pro:cloud" },
+      routing: { selected_model: "ollama-cloud/deepseek-v4-pro" },
       summary: "legacy shape from Reasonix",
       deliverables: [{
         type: "review",

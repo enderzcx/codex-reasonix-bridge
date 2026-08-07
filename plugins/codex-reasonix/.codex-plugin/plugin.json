@@ -1,0 +1,43 @@
+{
+  "name": "codex-reasonix",
+  "version": "0.2.0",
+  "description": "Use Reasonix / DeepSeek V4 Flash formal (deepseek-v4-flash:0731-cloud) from Codex for engineering consult, git review, adversarial review, and bounded delegation. Host keeps final judgment.",
+  "author": {
+    "name": "Ender",
+    "url": "https://github.com/enderzcx"
+  },
+  "homepage": "https://github.com/enderzcx/codex-reasonix-bridge",
+  "repository": "https://github.com/enderzcx/codex-reasonix-bridge",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "reasonix",
+    "deepseek",
+    "flash",
+    "review",
+    "ollama"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Codex Reasonix",
+    "shortDescription": "DeepSeek Flash formal review bridge for Codex.",
+    "longDescription": "Codex Reasonix packages the crb bridge as a Codex plugin with native MCP tools for consult, git-context review, adversarial review, and job management. Default model is DeepSeek V4 Flash formal (deepseek-v4-flash:0731-cloud). Codex remains the owner of scope, verification, and final judgment.",
+    "developerName": "Ender",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Consult",
+      "Git Review",
+      "Adversarial Review",
+      "Delegate",
+      "Job Status",
+      "Job Result"
+    ],
+    "defaultPrompt": [
+      "Use Reasonix to review my current diff.",
+      "Ask Reasonix for an adversarial review of this design.",
+      "Consult Reasonix on this architecture tradeoff."
+    ],
+    "brandColor": "#0F172A"
+  }
+}

@@ -3,8 +3,8 @@ lifetime:     long-term
 failure_cost: 我重跑
 default_mode: G2
 
-last_action:  2026-05-29 implemented plugin-cc-style result reliability, structured review schema, raw fallback, pruning, adversarial review, and docs contract
-next:         run smoke/install checks, then push if desired
+last_action:  2026-08-07 shipped Codex plugin packaging (MCP + skill + Agent Plugins dual surface), default model Flash formal 0731
+next:         push 0.2.0 if desired; user reloads Codex session to pick up reasonix_* tools
 blockers:     none
 
-observability: skip (reason: local CLI bridge, no hosted service yet)
+observability: skip (reason: local CLI/plugin bridge, no hosted service yet)

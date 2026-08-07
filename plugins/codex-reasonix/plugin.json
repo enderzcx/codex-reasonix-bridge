@@ -1,0 +1,29 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "codex-reasonix",
+  "version": "0.2.0",
+  "description": "Portable Reasonix / DeepSeek Flash formal bridge: consult, git review, adversarial review, and job tools for host agents.",
+  "author": {
+    "name": "Ender",
+    "url": "https://github.com/enderzcx"
+  },
+  "homepage": "https://github.com/enderzcx/codex-reasonix-bridge",
+  "repository": "https://github.com/enderzcx/codex-reasonix-bridge",
+  "license": "MIT",
+  "keywords": [
+    "agent-plugins",
+    "reasonix",
+    "deepseek",
+    "flash",
+    "review",
+    "codex",
+    "mcp"
+  ],
+  "extensions": {
+    "com.openai.codex": {
+      "manifest": ".codex-plugin/plugin.json",
+      "mcp": ".mcp.json",
+      "installSelector": "codex-reasonix@codex-reasonix-bridge"
+    }
+  }
+}

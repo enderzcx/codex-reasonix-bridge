@@ -1,0 +1,20 @@
+{
+  "name": "codex-reasonix-bridge",
+  "interface": {
+    "displayName": "Codex Reasonix Bridge"
+  },
+  "plugins": [
+    {
+      "name": "codex-reasonix",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex-reasonix"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

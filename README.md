@@ -1,25 +1,28 @@
 # codex-reasonix-bridge
 
-> Use Reasonix / DeepSeek v4 Pro from inside Codex for engineering review, second opinions, and focused delegation.
+> Codex **plugin + CLI** bridge to Reasonix / DeepSeek **V4 Flash formal** (`deepseek-v4-flash:0731-cloud`) for engineering review, second opinions, and focused delegation.
 
-`codex-reasonix-bridge` 是给 **已经在用 Codex、但想把 Reasonix / DeepSeek v4 Pro 接进 Codex 工作流** 的开发者用的 bridge。
+`codex-reasonix-bridge` 是给 **已经在用 Codex、想把 Reasonix / DeepSeek Flash 正式版接进工作流** 的开发者用的 bridge / plugin。
 
-它对标 [`openai/codex-plugin-cc`](https://github.com/openai/codex-plugin-cc) 的体验模型：plugin-cc 让 Claude Code 可以调用 Codex；本仓库让 Codex 可以调用 Reasonix / DeepSeek v4 Pro。工程 review 是当前最重要、最稳定的第一场景，但这个仓库的定位不是“只做 review”，而是 **Codex -> Reasonix** 的协作边界层。
+它对标 [`openai/codex-plugin-cc`](https://github.com/openai/codex-plugin-cc) 的体验模型：plugin-cc 让 Claude Code 可以调用 Codex；本仓库让 Codex 可以调用 Reasonix。**默认模型是 Flash 正式版 0731**（不是 Pro preview 主力）。工程 review 是第一场景，定位是 **Codex -> Reasonix** 协作边界层。
 
 ```text
-Codex plans/builds -> crb calls Reasonix -> DeepSeek v4 Pro responds -> Codex decides and verifies
+Codex plans/builds
+  -> plugin MCP reasonix_*  (or crb CLI)
+  -> Reasonix delegate
+  -> DeepSeek V4 Flash formal (0731)
+  -> Codex decides and verifies
 ```
 
 ## What You Get
 
-- `crb consult` / `crb ask`：从 Codex 会话里和 Reasonix / DeepSeek v4 Pro 单纯商量工程问题
-- `crb delegate`：从 Codex 会话里把工程问题交给 Reasonix / DeepSeek v4 Pro
-- `crb review`：像 plugin-cc 一样自动收集当前 git review context，再交给 DeepSeek 审查
-- `crb status` / `crb result` / `crb cancel`：管理后台任务，避免长 review 阻塞 Codex 主流程
-- `rendered` / `raw` / `result`：同时保留人类可读输出、原始模型输出和结构化 payload
-- JSON / fenced JSON / mixed output extraction：避免模型真实返回了内容，却被 bridge 误判成 “non-JSON”
-- Native delegate runtime：bridge 通过 `reasonix delegate` 调用 Reasonix；review/delegation 不再依赖 `reasonix run`
-- Input isolation：Reasonix reviewer 只看你显式传入的 task、context、diff 和文件，不偷偷读 Codex 本地 workspace
+- **Codex plugin**：`codex-reasonix` marketplace 安装，原生 MCP tools + skill
+- `reasonix_review` / `reasonix_consult` / `reasonix_delegate` / job tools
+- `crb consult` / `crb ask` / `crb review` / `crb delegate` CLI fallback
+- `crb status` / `crb result` / `crb cancel` 后台任务
+- Agent Plugins 可移植面：`plugins/codex-reasonix/plugin.json` + `mcp.json`
+- 默认路由：Flash formal `deepseek-v4-flash:0731-cloud`；Pro preview 仅显式对照
+- Input isolation：Reasonix 只看显式 task/context/diff，不偷读 workspace
 
 ## Requirements: 先安装 Reasonix
 
@@ -67,7 +70,30 @@ MiMo 的相关能力（文案、中文表达、UI/UX 设计、前端反馈等）
 
 ## 30 秒快速开始
 
-先安装并配置 Reasonix。确认 `reasonix delegate --mode final-review --dry-run --json ...` 能正常返回后，再安装 bridge：
+### A. 安装为 Codex plugin（推荐）
+
+先安装并配置 Reasonix + `OLLAMA_API_KEY`，并确保本机有：
+
+```bash
+ollama pull deepseek-v4-flash:0731-cloud
+```
+
+然后：
+
+```bash
+git clone https://github.com/enderzcx/codex-reasonix-bridge.git
+cd codex-reasonix-bridge
+npm test
+npm run check:plugin
+npm link   # 提供 crb CLI
+
+codex plugin marketplace add "$PWD"
+codex plugin add codex-reasonix@codex-reasonix-bridge
+```
+
+新开一个 Codex task。应能看到 `reasonix_*` MCP tools 与 `$codex-reasonix` skill。
+
+### B. 仅 CLI
 
 ```bash
 git clone https://github.com/enderzcx/codex-reasonix-bridge.git
@@ -80,7 +106,7 @@ npm link
 
 ```bash
 crb delegate --mode final-review --dry-run --json "审一下这个方案"
-# 预期：返回 deepseek-v4-pro:cloud 的路由信息，不调用模型
+# 预期：返回 ollama-cloud/deepseek-v4-pro 的路由信息，不调用模型
 ```
 
 进行真实 review：
@@ -104,17 +130,17 @@ REASONIX_BIN=/path/to/reasonix crb delegate --mode final-review --json "审一�
 
 ## 可用模式 (Modes)
 
-每个模式对应一个特定协作场景。`consult` 和关键 review 默认使用 `deepseek-v4-pro:cloud`；低成本通用任务使用 `deepseek-v4-flash:cloud`。
+每个模式对应一个特定协作场景。`consult` 和关键 review 默认使用 `ollama-cloud/deepseek-v4-pro`；低成本通用任务使用 `ollama-cloud/deepseek-v4-flash`。
 
 | 模式 | 默认模型 | 典型用途 |
 |---|---|---|
-| `consult` | `deepseek-v4-pro:cloud` | 纯商量、第二意见、focused delegation，不强制 review schema |
-| `engineering-feedback` | `deepseek-v4-pro:cloud` | 对 Codex 提交的方案或代码 diff 进行工程层面的反馈 |
-| `engineering-plan` | `deepseek-v4-pro:cloud` | 审查 Codex 的实现计划、验证策略和回滚方案 |
-| `daily-review` | `deepseek-v4-pro:cloud` | 日常开发中的快速 second opinion |
-| `final-review` | `deepseek-v4-pro:cloud` | 高价值变更前的最终、权威判断 |
-| `adversarial-review` | `deepseek-v4-pro:cloud` | 反方挑战审查，专找错误假设、隐藏风险、反例和回滚缺口 |
-| `general` | `deepseek-v4-flash:cloud` | 低成本、通用的混合咨询 fallback |
+| `consult` | `ollama-cloud/deepseek-v4-pro` | 纯商量、第二意见、focused delegation，不强制 review schema |
+| `engineering-feedback` | `ollama-cloud/deepseek-v4-pro` | 对 Codex 提交的方案或代码 diff 进行工程层面的反馈 |
+| `engineering-plan` | `ollama-cloud/deepseek-v4-pro` | 审查 Codex 的实现计划、验证策略和回滚方案 |
+| `daily-review` | `ollama-cloud/deepseek-v4-pro` | 日常开发中的快速 second opinion |
+| `final-review` | `ollama-cloud/deepseek-v4-pro` | 高价值变更前的最终、权威判断 |
+| `adversarial-review` | `ollama-cloud/deepseek-v4-pro` | 反方挑战审查，专找错误假设、隐藏风险、反例和回滚缺口 |
+| `general` | `ollama-cloud/deepseek-v4-flash` | 低成本、通用的混合咨询 fallback |
 
 ## 常用命令示例
 

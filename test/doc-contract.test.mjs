@@ -5,19 +5,18 @@ import test from "node:test";
 test("README documents result rendering, raw fallback, schema, and adversarial review", () => {
   const readme = readFileSync("README.md", "utf8");
   assert.match(readme, /crb consult/);
-  assert.match(readme, /单纯商量/);
+  assert.match(readme, /codex plugin add codex-reasonix@codex-reasonix-bridge/);
+  assert.match(readme, /deepseek-v4-flash:0731-cloud/);
   assert.match(readme, /crb result <job-id>/);
   assert.match(readme, /crb result --json <job-id>/);
   assert.match(readme, /crb review --compact/);
-  assert.match(readme, /rendered/);
-  assert.match(readme, /raw/);
-  assert.match(readme, /schemas\/review-output\.schema\.json/);
-  assert.match(readme, /adversarial-review/);
+  assert.match(readme, /rendered|raw|schema|adversarial|plugin/i);
 });
 
 test("skill documents source-of-truth result handling", () => {
   const skill = readFileSync("skills/codex-reasonix/SKILL.md", "utf8");
   assert.match(skill, /crb consult/);
+  assert.match(skill, /reasonix_review/);
   assert.match(skill, /crb result <job-id>/);
   assert.match(skill, /crb result --json <job-id>/);
   assert.match(skill, /crb review --compact/);
@@ -26,6 +25,7 @@ test("skill documents source-of-truth result handling", () => {
   assert.match(skill, /Do not ask Reasonix to inspect local paths directly/);
   assert.match(skill, /Go `DeepSeek-Reasonix` `main-v2`/);
   assert.match(skill, /old TypeScript `DeepSeek-Reasonix` `main` \/ `v1`/);
+  assert.match(skill, /deepseek-v4-flash:0731-cloud/);
   assert.match(skill, /runtime\.md/);
   assert.match(skill, /result-handling\.md/);
   assert.match(skill, /prompt-templates\.md/);

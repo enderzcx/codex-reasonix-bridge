@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { DEFAULT_TIMEOUT_MS, resolveTimeoutMs, runReasonixDelegate } from "../src/reasonix.mjs";
+import { DEFAULT_TIMEOUT_MS, prepareIsolatedReasonixHome, readReasonixCredentialEnv, resolveTimeoutMs, runReasonixDelegate } from "../src/reasonix.mjs";
 
 test("resolveTimeoutMs uses default and validates explicit values", () => {
   assert.equal(resolveTimeoutMs(undefined), DEFAULT_TIMEOUT_MS);
@@ -11,6 +11,60 @@ test("resolveTimeoutMs uses default and validates explicit values", () => {
   assert.equal(resolveTimeoutMs("2500"), 2500);
   assert.throws(() => resolveTimeoutMs("-1"), /invalid Reasonix timeout/);
   assert.throws(() => resolveTimeoutMs("soon"), /invalid Reasonix timeout/);
+});
+
+test("readReasonixCredentialEnv carries Go Reasonix dotenv secrets into isolated runs", () => {
+  const dir = mkdtempSync(join(tmpdir(), "crb-reasonix-home-source-"));
+  mkdirSync(join(dir, ".reasonix"));
+  writeFileSync(
+    join(dir, ".reasonix", ".env"),
+    [
+      "DEEPSEEK_API_KEY=from-dotenv",
+      "QUOTED_KEY=\"quoted value\"",
+      "SINGLE_QUOTED='single quoted'",
+      "# ignored",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    join(dir, ".reasonix", "config.json"),
+    JSON.stringify({ apiKey: "legacy", baseUrl: "https://legacy.example", ollamaApiKey: "legacy-ollama" }),
+  );
+
+  const originalDeepSeek = process.env.DEEPSEEK_API_KEY;
+  try {
+    delete process.env.DEEPSEEK_API_KEY;
+    const env = readReasonixCredentialEnv(dir);
+    assert.equal(env.DEEPSEEK_API_KEY, "from-dotenv");
+    assert.equal(env.DEEPSEEK_BASE_URL, "https://legacy.example");
+    assert.equal(env.OLLAMA_API_KEY, "legacy-ollama");
+    assert.equal(env.QUOTED_KEY, "quoted value");
+    assert.equal(env.SINGLE_QUOTED, "single quoted");
+
+    process.env.DEEPSEEK_API_KEY = "from-shell";
+    assert.equal(readReasonixCredentialEnv(dir).DEEPSEEK_API_KEY, undefined);
+  } finally {
+    if (originalDeepSeek === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = originalDeepSeek;
+  }
+});
+
+test("prepareIsolatedReasonixHome copies config and materializes credentials only", () => {
+  const sourceHome = mkdtempSync(join(tmpdir(), "crb-reasonix-source-home-"));
+  const isolatedHome = mkdtempSync(join(tmpdir(), "crb-reasonix-target-home-"));
+  mkdirSync(join(sourceHome, ".reasonix"));
+  writeFileSync(join(sourceHome, ".reasonix", "config.toml"), '[[providers]]\nname = "ollama-cloud"\napi_key_env = "OLLAMA_API_KEY"\n');
+  writeFileSync(join(sourceHome, ".reasonix", ".env"), "OLLAMA_API_KEY=secret-token\nSPACED_KEY='two words'\n");
+  mkdirSync(join(sourceHome, ".reasonix", "sessions"));
+  writeFileSync(join(sourceHome, ".reasonix", "sessions", "ignored.jsonl"), "{}\n");
+
+  prepareIsolatedReasonixHome(isolatedHome, sourceHome);
+
+  assert.equal(readFileSync(join(isolatedHome, ".reasonix", "config.toml"), "utf8").includes("ollama-cloud"), true);
+  const envText = readFileSync(join(isolatedHome, ".reasonix", ".env"), "utf8");
+  assert.match(envText, /OLLAMA_API_KEY=secret-token/);
+  assert.match(envText, /SPACED_KEY="two words"/);
+  assert.equal(existsSync(join(isolatedHome, ".reasonix", "sessions", "ignored.jsonl")), false);
 });
 
 test("runReasonixDelegate fails clearly when the child process times out", async () => {

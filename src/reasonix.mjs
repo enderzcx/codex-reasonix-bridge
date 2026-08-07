@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
 import { basename, join } from "node:path";
@@ -84,6 +84,7 @@ export async function runReasonixDelegate({
   if (task) args.push(task);
 
   const isolatedHome = isolateRuntime ? mkdtempSync(join(tmpdir(), "crb-reasonix-home-")) : null;
+  if (isolatedHome) prepareIsolatedReasonixHome(isolatedHome);
   const child = spawn(command[0], args, {
     stdio: ["ignore", "pipe", "pipe"],
     env: buildReasonixEnv({ isolateRuntime, isolatedHome }),
@@ -130,7 +131,7 @@ export async function runReasonixDelegate({
     const detail = partial ? ` Partial output: ${partial.slice(0, 1000)}` : "";
     throw new Error(
       `Reasonix delegate timed out after ${timeoutMs}ms with model ${model}. ` +
-        "Try a smaller review input, a more targeted prompt, --model deepseek-v4-flash:cloud, or a higher --timeout-ms." +
+        "Try a smaller review input, a more targeted prompt, --model ollama-cloud/deepseek-v4-flash, or a higher --timeout-ms." +
         detail,
     );
   }
@@ -149,7 +150,7 @@ export function resolveReasonixDelegateCapabilities(command) {
 
   const help = spawnSync(command[0], [...command.slice(1), "delegate", "--help"], {
     encoding: "utf8",
-    timeout: 750,
+    timeout: 5000,
     env: buildReasonixEnv({ isolateRuntime: false, isolatedHome: null }),
   });
   const text = `${help.stdout ?? ""}\n${help.stderr ?? ""}`;
@@ -185,18 +186,39 @@ function resolveReasonixBridgeCli() {
   return existsSync(overlayCli) ? overlayCli : "";
 }
 
-function readReasonixCredentialEnv() {
+export function prepareIsolatedReasonixHome(isolatedHome, sourceHome = homedir()) {
+  const sourceDir = join(sourceHome, ".reasonix");
+  const targetDir = join(isolatedHome, ".reasonix");
+  mkdirSync(targetDir, { recursive: true, mode: 0o700 });
+
+  const configPath = join(sourceDir, "config.toml");
+  if (existsSync(configPath)) {
+    copyFileSync(configPath, join(targetDir, "config.toml"));
+  }
+
+  const credentialEnv = readReasonixCredentialEnv(sourceHome);
+  const lines = Object.entries(credentialEnv)
+    .filter(([key, value]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(key) && typeof value === "string" && value)
+    .map(([key, value]) => `${key}=${quoteDotEnvValue(value)}`)
+    .sort();
+  if (lines.length) {
+    writeFileSync(join(targetDir, ".env"), `${lines.join("\n")}\n`, { mode: 0o600 });
+  }
+}
+
+export function readReasonixCredentialEnv(homeDir = homedir()) {
   const env = {};
+  Object.assign(env, readReasonixDotEnv(homeDir));
   try {
-    const raw = readFileSync(join(homedir(), ".reasonix", "config.json"), "utf8");
+    const raw = readFileSync(join(homeDir, ".reasonix", "config.json"), "utf8");
     const cfg = JSON.parse(raw);
-    if (!process.env.DEEPSEEK_API_KEY && typeof cfg.apiKey === "string" && cfg.apiKey) {
+    if (!process.env.DEEPSEEK_API_KEY && !env.DEEPSEEK_API_KEY && typeof cfg.apiKey === "string" && cfg.apiKey) {
       env.DEEPSEEK_API_KEY = cfg.apiKey;
     }
-    if (!process.env.DEEPSEEK_BASE_URL && !process.env.DEEPSEEK_API_BASE_URL && typeof cfg.baseUrl === "string" && cfg.baseUrl) {
+    if (!process.env.DEEPSEEK_BASE_URL && !process.env.DEEPSEEK_API_BASE_URL && !env.DEEPSEEK_BASE_URL && typeof cfg.baseUrl === "string" && cfg.baseUrl) {
       env.DEEPSEEK_BASE_URL = cfg.baseUrl;
     }
-    if (!process.env.OLLAMA_API_KEY && typeof cfg.ollamaApiKey === "string" && cfg.ollamaApiKey) {
+    if (!process.env.OLLAMA_API_KEY && !env.OLLAMA_API_KEY && typeof cfg.ollamaApiKey === "string" && cfg.ollamaApiKey) {
       env.OLLAMA_API_KEY = cfg.ollamaApiKey;
       env.ollamaApiKey = cfg.ollamaApiKey;
     }
@@ -204,4 +226,36 @@ function readReasonixCredentialEnv() {
     // Best-effort only. Reasonix will still read explicit env vars or local .env.
   }
   return env;
+}
+
+function readReasonixDotEnv(homeDir) {
+  const env = {};
+  try {
+    const raw = readFileSync(join(homeDir, ".reasonix", ".env"), "utf8");
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const match = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(trimmed);
+      if (!match) continue;
+      const [, key, value] = match;
+      if (process.env[key]) continue;
+      env[key] = unquoteDotEnvValue(value);
+    }
+  } catch {
+    // Best-effort only. Reasonix will still read explicit env vars.
+  }
+  return env;
+}
+
+function unquoteDotEnvValue(value) {
+  const trimmed = value.trim();
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function quoteDotEnvValue(value) {
+  if (/^[^\s"'#=]+$/.test(value)) return value;
+  return JSON.stringify(value);
 }

@@ -1,7 +1,7 @@
 {
   "name": "codex-reasonix-bridge",
-  "version": "0.1.0",
-  "description": "Use Reasonix / DeepSeek v4 Pro from inside Codex for engineering review, second opinions, and focused delegation.",
+  "version": "0.2.0",
+  "description": "Codex plugin + CLI bridge to Reasonix / DeepSeek V4 Flash formal for engineering review, second opinions, and focused delegation.",
   "type": "module",
   "bin": {
     "codex-reasonix-bridge": "./bin/codex-reasonix-bridge.mjs",
@@ -9,6 +9,7 @@
   },
   "scripts": {
     "test": "node --test",
+    "check:plugin": "node ./scripts/check_plugin.mjs",
     "smoke": "node ./bin/codex-reasonix-bridge.mjs delegate --mode final-review --dry-run --json \"审一下这个方案\"",
     "install:skill": "node ./scripts/install-skill.mjs"
   },
@@ -16,6 +17,9 @@
     "codex",
     "reasonix",
     "deepseek",
+    "flash",
+    "plugin",
+    "mcp",
     "ollama",
     "ai-native",
     "review"
